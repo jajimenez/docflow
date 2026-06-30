@@ -1,2 +1,3 @@
-# docflow
-Data pipeline and MCP server for documentation from multiple sources
+# Docflow
+
+Airflow DAG and MCP server for ingesting documentation from multiple sources
