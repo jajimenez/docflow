@@ -10,9 +10,6 @@ bashrc_file="$HOME/.bashrc"
 # to version control systems).
 secrets_env_file=/workspace/docflow/.devcontainer/secrets.env
 
-# Initialize Docflow
-echo "Initializing Docflow..."
-
 # Install the project in editable mode with its dependencies into Airflow's
 # own Python environment. This serves double duty: Airflow can import from
 # the docflow package at DAG runtime, and VS Code uses the same environment.
