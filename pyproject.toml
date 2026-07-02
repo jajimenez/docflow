@@ -1,0 +1,26 @@
+[project]
+name = "docflow"
+version = "0.1.0"
+description = "Airflow DAG and MCP server for ingesting documentation from multiple sources"
+readme = "README.md"
+authors = [{ name = "Jose A. Jimenez", email = "jajimenezcarm@gmail.com" }]
+requires-python = ">=3.14"
+dependencies = [
+    "psycopg>=3.3.4,<3.4.0",
+    "sqlalchemy>=2.0.51,<2.1.0",
+    "sqlmodel>=0.0.39,<0.1.0",
+    "pydantic-settings>=2.14.2,<2.15.0",
+    "docling[tesserocr]>=2.108.0,<2.109.0",
+    "langchain-text-splitters>=1.1.2,<1.2.0",
+    "requests>=2.34.2,<2.35.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=26.5.1,<26.6.0",
+    "debugpy>=1.8.21,<1.9.0"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
