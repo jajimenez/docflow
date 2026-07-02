@@ -4,7 +4,9 @@ import requests
 
 
 def get_embedding(api_url: str, api_timeout: int, model: str, text: str) -> list[float]:
-    """Get the embedding of a text using the Ollama embedding API.
+    """Get the embedding of a text.
+
+    The Ollama embedding API is used to generate the embedding.
 
     Args:
         api_url: Ollama embedding API URL (e.g.

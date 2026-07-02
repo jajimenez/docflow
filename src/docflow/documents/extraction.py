@@ -11,9 +11,8 @@ from docling.document_converter import PdfFormatOption, DocumentConverter
 def extract_text(models_path: str, doc_path: str) -> str:
     """Extract the text of a PDF document in Markdown format.
 
-    This function uses the Docling library to extract the text of the document, using
-    models already downloaded, which usually are in the "~/.cache/docling/models"
-    directory.
+    The Docling library is used to extract the text of the document, using models
+    already downloaded, which usually are in the "~/.cache/docling/models" directory.
 
     Args:
         models_path: Path of the directory containing the Docling models.

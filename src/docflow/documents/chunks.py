@@ -10,8 +10,7 @@ def split_text(
 ) -> list[str]:
     """Split a Markdown text into chunks of a specified size with overlap.
 
-    This function uses LangChain's MarkdownTextSplitter, which respects Markdown
-    structure.
+    LangChain's MarkdownTextSplitter is used, which respects Markdown structure.
 
     Args:
         text: Markdown text to split.
