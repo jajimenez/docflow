@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Dev container secrets (auto-generated, must never be committed)
+.devcontainer/secrets.env
+.devcontainer/docker-compose.local.yml
+.devcontainer/.init_done
+.devcontainer/airflow-passwords.json

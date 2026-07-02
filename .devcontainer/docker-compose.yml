@@ -1,0 +1,121 @@
+services:
+  # Airflow application (DAG Processor, Scheduler and API)
+  airflow:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.airflow
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg://docflow:docflow@airflow-db:5432/docflow"
+      AIRFLOW__CORE__EXECUTOR: "LocalExecutor"
+      AIRFLOW__CORE__DAGS_FOLDER: "/workspace/docflow/src/dags"
+      AIRFLOW__CORE__PLUGINS_FOLDER: "/workspace/docflow/src/plugins"
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__TEST_CONNECTION: "Enabled"
+      AIRFLOW__API__EXPOSE_CONFIG: "true"  # In production, set to False
+      # SimpleAuthManager is the default auth manager in Airflow 3. Declare the
+      # admin user here; the password is seeded by airflow-init.sh into the file
+      # below so it stays predictable across container rebuilds.
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:Admin"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/workspace/docflow/.devcontainer/airflow-passwords.json"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ..:/workspace/docflow
+
+    # Prevent the container from exiting immediately
+    command: "sleep infinity"
+  
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      knowledge-db:
+        condition: service_healthy
+
+  # Airflow Metadata Database
+  airflow-db:
+    image: postgres:18.4
+    environment:
+      POSTGRES_USER: docflow
+      POSTGRES_PASSWORD: docflow
+      POSTGRES_DB: docflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql
+    restart: unless-stopped
+    
+    # After 10 seconds, Docker Engine runs "pg_isready" every 5 seconds with a 5-second
+    # timeout. After 5 consecutive failures, the container is marked as unhealthy.
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "docflow", "-d", "docflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Ollama
+  ollama:
+    image: ollama/ollama:0.31.1
+    environment:
+      # "host:port"
+      OLLAMA_HOST: 0.0.0.0:11434
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "OLLAMA_HOST=http://localhost:11434 ollama list"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    mem_limit: 8g
+    command: ["serve"]
+    restart: unless-stopped
+
+  # Ollama initializer (must run after the "ollama" service)
+  ollama-init:
+    image: ollama/ollama:0.31.1
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama-data:/root/.ollama
+    command: ["pull", "nomic-embed-text:v1.5"]
+    restart: "no"
+
+  # Knowledge base
+  knowledge-db:
+    build:
+      context: ..
+      dockerfile: Dockerfile.knowledge-db
+    environment:
+      POSTGRES_USER: docflow
+      POSTGRES_PASSWORD: docflow
+      POSTGRES_DB: docflow
+    volumes:
+      - knowledge-db-data:/var/lib/postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "docflow", "-d", "docflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Database administration UI
+  adminer:
+    image: adminer:5.4.2
+    ports:
+      - "8081:8080"
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      knowledge-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  airflow-db-data:
+  ollama-data:
+  knowledge-db-data:

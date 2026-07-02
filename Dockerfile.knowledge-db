@@ -1,0 +1,29 @@
+# Extends the official PostgreSQL image with the pgvector extension for vector similarity search
+
+FROM postgres:18.4
+
+ARG PGVECTOR_DIR=/pgvector
+ARG PGVECTOR_REF=v0.8.4
+
+# Build and install pgvector from source, then purge the build dependencies to keep the image small
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        postgresql-server-dev-18 \
+        ca-certificates git && \
+    git clone \
+        --branch "$PGVECTOR_REF" \
+        --depth 1 \
+        https://github.com/pgvector/pgvector.git \
+        "$PGVECTOR_DIR" && \
+    make -C "$PGVECTOR_DIR" -j "$(nproc)" && \
+    make -C "$PGVECTOR_DIR" install && \
+    apt-get purge -y --auto-remove \
+        build-essential \
+        postgresql-server-dev-18 \
+        git && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* "$PGVECTOR_DIR"
+
+# Run initialization SQL on first startup to enable required extensions
+COPY knowledge-db-init.sql /docker-entrypoint-initdb.d/init.sql
