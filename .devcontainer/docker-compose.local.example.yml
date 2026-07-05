@@ -1,0 +1,14 @@
+# Local overrides template — copy this file to docker-compose.local.yml and
+# customise it for your local environment. docker-compose.local.yml is gitignored
+# so your changes will never be committed.
+#
+# VS Code creates it automatically from this template via initializeCommand if it
+# doesn't already exist.
+#
+# Example override for Colima or remote SSH users (socat proxies adminer:8080 so
+# VS Code port forwarding works without Docker Desktop's networking layer):
+#
+# services:
+#   airflow:
+#     command: ["/bin/bash", "-c", "socat TCP-LISTEN:8081,fork,reuseaddr TCP:adminer:8080 & sleep infinity"]
+services: {}

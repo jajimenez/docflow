@@ -1,0 +1,48 @@
+FROM apache/airflow:3.3.0rc1-python3.14
+
+# Switch to root to install system packages
+USER root
+
+# Install system dependencies:
+# - sudo and ca-certificates (dev container essentials)
+# - git and build tools (source control and compiling C extensions)
+# - libpq-dev and python3-dev (required to compile psycopg from source)
+# - libgl1 and libglib2.0-0 (required by Docling via OpenCV)
+# - tesseract-ocr-all (OCR engine used by Docling, with all language packs)
+# - socat (proxies localhost:8081 -> adminer:8080 so VS Code can forward the port)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        sudo \
+        ca-certificates \
+        git \
+        build-essential \
+        libpq-dev \
+        python3-dev \
+        libgl1 \
+        libglib2.0-0 \
+        tesseract-ocr-all \
+        socat && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Tell Docling where to find Tesseract's language data files
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
+
+# Grant the "airflow" user passwordless sudo, matching the convention used in official
+# Microsoft devcontainer images. Do not do this in a production image.
+RUN echo "airflow ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Switch back to the default Airflow user
+USER airflow
+
+# Install Docling and its extras. This is done here rather than in postCreateCommand
+# so the heavy download happens at image-build time and is cached in the layer.
+# The workspace is not available during build, so the project itself (docflow) is
+# installed in editable mode later by postCreateCommand.
+RUN pip install --no-cache-dir "docling[tesserocr]>=2.108.0,<2.109.0"
+
+# Download Docling models into the image so postCreateCommand doesn't need to.
+RUN docling-tools models download layout tableformer
+
+# Clear the Airflow entrypoint so VS Code can attach to this container as a dev container
+ENTRYPOINT []

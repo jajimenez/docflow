@@ -1,0 +1,24 @@
+{
+    "name": "Docflow Dev Container",
+    "dockerComposeFile": ["docker-compose.yml", "docker-compose.local.yml"],
+    "service": "airflow",
+    "workspaceFolder": "/workspace/docflow",
+    "remoteUser": "airflow",
+    "initializeCommand": "[ -f .devcontainer/docker-compose.local.yml ] || cp .devcontainer/docker-compose.local.example.yml .devcontainer/docker-compose.local.yml",
+    "postCreateCommand": ["bash", ".devcontainer/airflow-init.sh"],
+    "forwardPorts": [8080, 8081],
+    "shutdownAction": "stopCompose",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/home/airflow/.local/bin/python3"
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-python.debugpy",
+                "ms-python.vscode-python-envs"
+            ]
+        }
+    }
+}
