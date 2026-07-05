@@ -17,6 +17,14 @@ services:
       # below so it stays predictable across container rebuilds.
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:Admin"
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/workspace/docflow/.devcontainer/airflow-passwords.json"
+      # Docflow settings
+      DOCFLOW_PDF_PATH: "/workspace/docflow/documents"
+      DOCFLOW_PDF_PENDING_DIR: "pending"
+      DOCFLOW_PDF_PROCESSED_DIR: "processed"
+      DOCFLOW_PDF_FAILED_DIR: "failed"
+      DOCFLOW_EXTRACTION_MODELS_PATH: "/root/.cache/docling/models"
+      DOCFLOW_EMBEDDINGS_API_URL: "http://ollama:11434/api/embeddings"
+      DOCFLOW_KNOWLEDGE_DB_URL: "postgresql+psycopg://docflow:docflow@knowledge-db:5432/docflow"
     ports:
       - "8080:8080"
     volumes:
