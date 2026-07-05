@@ -1,4 +1,4 @@
-"""Module for extracting text from PDF files."""
+"""Module for processing PDF files."""
 
 from pathlib import Path
 
