@@ -8,7 +8,7 @@ from docflow.config import settings
 class Vector(UserDefinedType):
     """PostgreSQL vector type."""
 
-    def __init__(self, precision: int = settings.emb_dimension):
+    def __init__(self, precision: int = settings.embeddings_dimension):
         """Initialize the vector type.
 
         Args:
