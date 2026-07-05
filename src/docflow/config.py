@@ -13,9 +13,7 @@ class Settings(BaseSettings):
     pdf_pending_dir: str
     pdf_processed_dir: str
     pdf_failed_dir: str
-
-    # Docling text extraction models
-    extraction_models_path: str
+    pdf_extraction_models_path: str  # Docling text extraction models
 
     # Document chunks
     chunk_size: int = 1000
