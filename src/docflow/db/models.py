@@ -43,7 +43,7 @@ class DocumentStatus(str, Enum):
     FAILED = "failed"
 
 
-class SourceType(str, Enum):
+class DocumentSourceType(str, Enum):
     """Document source type."""
 
     PDF = "pdf"
