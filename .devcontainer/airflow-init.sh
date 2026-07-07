@@ -10,6 +10,8 @@ bashrc_file="$HOME/.bashrc"
 # to version control systems).
 secrets_env_file=/workspace/docflow/.devcontainer/secrets.env
 
+echo "Initializing Airflow environment..."
+
 # Install the project in editable mode with its dependencies into Airflow's
 # own Python environment. This serves double duty: Airflow can import from
 # the docflow package at DAG runtime, and VS Code uses the same environment.
@@ -57,6 +59,25 @@ fi
 echo "Initializing Airflow metadata database..."
 airflow db migrate
 
+# Create Airflow connections
+echo "Creating Airflow connections..."
+airflow connections delete knowledge_db 2>/dev/null || true
+
+airflow connections add knowledge_db \
+    --conn-type postgres \
+    --conn-host "$DOCFLOW_KNOWLEDGE_DB_HOST" \
+    --conn-login "$DOCFLOW_KNOWLEDGE_DB_USER" \
+    --conn-password "$DOCFLOW_KNOWLEDGE_DB_PASSWORD" \
+    --conn-port "${DOCFLOW_KNOWLEDGE_DB_PORT:-5432}" \
+    --conn-schema "$DOCFLOW_KNOWLEDGE_DB_NAME" \
+    --conn-description "Knowledge base PostgreSQL database"
+
+# Create Airflow variables
+echo "Creating Airflow variables..."
+airflow variables set DOCFLOW_PDF_PENDING_DIR "$DOCFLOW_PDF_PENDING_DIR"
+airflow variables set DOCFLOW_PDF_PROCESSED_DIR "$DOCFLOW_PDF_PROCESSED_DIR"
+airflow variables set DOCFLOW_PDF_FAILED_DIR "$DOCFLOW_PDF_FAILED_DIR"
+
 # Seed the SimpleAuthManager password file with a known development password.
 # Airflow 3 uses SimpleAuthManager by default; it stores passwords in
 # plaintext JSON (by design for development — do not use this in production).
@@ -64,4 +85,4 @@ airflow db migrate
 echo "Creating Airflow admin user..."
 echo '{"admin":"admin"}' > /workspace/docflow/.devcontainer/airflow-passwords.json
 
-echo "Docflow initialization completed."
+echo "Airflow environment initialization completed."
