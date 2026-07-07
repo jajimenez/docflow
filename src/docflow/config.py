@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import computed_field
 from pydantic_settings import BaseSettings
 
 
@@ -9,7 +10,6 @@ class Settings(BaseSettings):
     """Docflow settings."""
 
     # PDF files
-    pdf_path: str
     pdf_pending_dir: str
     pdf_processed_dir: str
     pdf_failed_dir: str
@@ -26,7 +26,19 @@ class Settings(BaseSettings):
     embeddings_dimension: int = 768
 
     # Knowledge database
-    knowledge_db_url: str
+    knowledge_db_host: str
+    knowledge_db_user: str
+    knowledge_db_password: str
+    knowledge_db_port: int = 5432
+    knowledge_db_name: str
+
+    @computed_field
+    @property
+    def knowledge_db_url(self) -> str:
+        return (
+            f"postgresql+psycopg://{self.knowledge_db_user}:{self.knowledge_db_password}"
+            f"@{self.knowledge_db_host}:{self.knowledge_db_port}/{self.knowledge_db_name}"
+        )
 
     class Config:
         """Settings metadata."""

@@ -31,14 +31,14 @@ logger = logging.getLogger(__name__)
 def get_document(
     session: Session,
     id: UUID | None = None,
-    file_path: str | None = None,
+    source_file_path: str | None = None,
 ) -> Document | None:
     """Get a document by its ID or its file path (if it's a PDF file).
 
     Args:
         session: Database session.
         id: Document ID (optional).
-        file_path: Document file path (optional).
+        source_file_path: Document source file path (optional).
 
     Returns:
         Document if found or None otherwise.
@@ -47,10 +47,10 @@ def get_document(
 
     if id is not None:
         stmt = stmt.where(Document.id == id)
-    elif file_path is not None:
-        stmt = stmt.where(Document.file_path == file_path)
+    elif source_file_path is not None:
+        stmt = stmt.where(Document.source_file_path == source_file_path)
     else:
-        raise ValueError('Either "id" or "file_path" must be provided.')
+        raise ValueError('Either "id" or "source_file_path" must be provided.')
 
     return session.exec(stmt).first()
 
@@ -113,19 +113,19 @@ def extract_text(doc: Document) -> str:
         Document text in Markdown format.
     """
     if doc.source_type == "pdf":
-        if not doc.file_path:
+        if not doc.source_file_path:
             message = f'Document "{doc.id}" does not have a file path'
             logger.error(message)
 
             raise ValueError(message)
 
-        if not Path(doc.file_path).exists():
-            message = f'File path "{doc.file_path}" does not exist'
+        if not Path(doc.source_file_path).exists():
+            message = f'File path "{doc.source_file_path}" does not exist'
             logger.error(message)
 
             raise ValueError(message)
 
-        return extract_pdf_text(settings.pdf_extraction_models_path, doc.file_path)
+        return extract_pdf_text(settings.pdf_extraction_models_path, doc.source_file_path)
     elif doc.source_type == "github":
         raise NotImplementedError("Text extraction from GitHub is not implemented yet")
     elif doc.source_type == "azure_devops":
@@ -147,7 +147,7 @@ def process_document(session: Session, doc_id: UUID):
     """Process an existing document.
 
     When this function starts, the status of the document is set to Processing. When
-    this function ends, the status is set to Completed. If an exception occurs during
+    this function ends, the status is set to Processed. If an exception occurs during
     the processing, the status is set to Failed.
 
     Args:
@@ -166,7 +166,7 @@ def process_document(session: Session, doc_id: UUID):
 
     try:
         # Set the status to Processing
-        doc.status = DocumentStatus.PROCESSING
+        doc.status = DocumentStatus.processing
         session.commit()
         logger.info(PROCCESSING_DOC.format(doc.id))
 
@@ -205,8 +205,8 @@ def process_document(session: Session, doc_id: UUID):
 
             session.add(dc)
 
-        # Set the status to Completed
-        doc.status = DocumentStatus.COMPLETED
+        # Set the status to Processed
+        doc.status = DocumentStatus.processed
         session.commit()
         logger.info(PROC_DOC_COMPLETED.format(doc.id))
 
@@ -216,7 +216,7 @@ def process_document(session: Session, doc_id: UUID):
 
         try:
             # Set the status to Failed
-            doc.status = DocumentStatus.FAILED
+            doc.status = DocumentStatus.failed
             session.commit()
         except Exception:
             session.rollback()

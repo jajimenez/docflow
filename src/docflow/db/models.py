@@ -37,16 +37,16 @@ from docflow.db.types import Vector
 class DocumentStatus(str, Enum):
     """Document status."""
 
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    pending = "pending"
+    processing = "processing"
+    processed = "processed"
+    failed = "failed"
 
 
-class SourceType(str, Enum):
+class DocumentSourceType(str, Enum):
     """Document source type."""
 
-    PDF = "pdf"
+    pdf = "pdf"
     GITHUB = "github"
     AZURE_DEVOPS = "azure_devops"
     CONFLUENCE = "confluence"
@@ -65,20 +65,18 @@ class Document(SQLModel, table=True):
         )
     )
 
-    source_type: SourceType = Field(
+    source_type: DocumentSourceType = Field(
         sa_column=Column(
-            SaEnum(SourceType, name="source_type"),
+            SaEnum(DocumentSourceType, name="source_type"),
             nullable=False,
         )
     )
-
-    title: str = Field(min_length=1, max_length=200)
 
     # Local filesystem path (mounted volume). Set for PDF documents, null for remote
     # sources (GitHub, Confluence, Azure DevOps) that are identified by source_url
     # instead. PostgreSQL allows multiple nulls in a unique index, so the uniqueness
     # constraint still prevents duplicate PDF ingestion.
-    file_path: str | None = Field(
+    source_file_path: str | None = Field(
         default=None, unique=True, min_length=1, max_length=500
     )
 
@@ -91,6 +89,8 @@ class Document(SQLModel, table=True):
         default=None, sa_column=Column(Text, nullable=True, unique=True)
     )
 
+    title: str = Field(min_length=1, max_length=200)
+
     # Flexible storage for source-specific metadata
     extra_metadata: dict | None = Field(
         default=None, sa_column=Column(JSONB, nullable=True)
@@ -100,9 +100,9 @@ class Document(SQLModel, table=True):
         sa_column=Column(
             SaEnum(DocumentStatus, name="document_status"),
             nullable=False,
-            server_default=text(f"'PENDING'"),
+            server_default=text(f"'pending'"),
         ),
-        default=DocumentStatus.PENDING,
+        default=DocumentStatus.pending,
     )
 
     created_at: datetime | None = Field(
@@ -127,15 +127,15 @@ class Document(SQLModel, table=True):
     )
 
     __table_args__ = (
-        # Enforce the mutual exclusivity between file_path and source_url:
-        #   - PDF documents must have a file_path and no source_url.
-        #   - Remote documents must have a source_url and no file_path.
-        # This guarantees file_path is never null for PDF documents and source_url is
+        # Enforce the mutual exclusivity between source_file_path and source_url:
+        #   - PDF documents must have a source_file_path and no source_url.
+        #   - Remote documents must have a source_url and no source_file_path.
+        # This guarantees source_file_path is never null for PDF documents and source_url is
         # never null for remote sources.
         CheckConstraint(
-            "(source_type = 'pdf' AND file_path IS NOT NULL AND source_url IS NULL)"
+            "(source_type = 'pdf' AND source_file_path IS NOT NULL AND source_url IS NULL)"
             " OR "
-            "(source_type != 'pdf' AND source_url IS NOT NULL AND file_path IS NULL)",
+            "(source_type != 'pdf' AND source_url IS NOT NULL AND source_file_path IS NULL)",
             name="check_document_source_fields",
         ),
     )

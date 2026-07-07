@@ -222,3 +222,8 @@ __marimo__/
 .devcontainer/docker-compose.local.yml
 .devcontainer/.init_done
 .devcontainer/airflow-passwords.json
+
+# PDF pipeline directories - ignore PDFs but keep directory structure
+pdf/pending/*.pdf
+pdf/processed/*.pdf
+pdf/failed/*.pdf
