@@ -7,8 +7,8 @@ services:
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg://docflow:docflow@airflow-db:5432/docflow"
       AIRFLOW__CORE__EXECUTOR: "LocalExecutor"
-      AIRFLOW__CORE__DAGS_FOLDER: "/workspace/docflow/src/dags"
-      AIRFLOW__CORE__PLUGINS_FOLDER: "/workspace/docflow/src/plugins"
+      AIRFLOW__CORE__DAGS_FOLDER: "/workspace/docflow/src/docflow/dags"
+      AIRFLOW__CORE__PLUGINS_FOLDER: "/workspace/docflow/src/docflow/plugins"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__TEST_CONNECTION: "Enabled"
       AIRFLOW__API__EXPOSE_CONFIG: "true"  # In production, set to False
