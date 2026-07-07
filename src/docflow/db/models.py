@@ -47,9 +47,9 @@ class DocumentSourceType(str, Enum):
     """Document source type."""
 
     pdf = "pdf"
-    GITHUB = "github"
-    AZURE_DEVOPS = "azure_devops"
-    CONFLUENCE = "confluence"
+    github = "github"
+    azure_devops = "azure_devops"
+    confluence = "confluence"
 
 
 class Document(SQLModel, table=True):
