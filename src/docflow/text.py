@@ -4,6 +4,23 @@ source (PDF, GitHub, Azure DevOps or Confluence).
 
 import requests
 from langchain_text_splitters import MarkdownTextSplitter
+from markdownify import markdownify
+
+
+def convert_html_to_markdown(html: str) -> str:
+    """Convert an HTML string to Markdown.
+
+    This is used to convert source content that is provided as HTML (e.g. the Confluence
+    storage format, which is XHTML-based) into Markdown, so that it can be processed the
+    same way as the text extracted from other sources.
+
+    Args:
+        html: HTML content to convert.
+
+    Returns:
+        Markdown text.
+    """
+    return markdownify(html or "").strip()
 
 
 def split_text(

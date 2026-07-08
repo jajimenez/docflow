@@ -1,4 +1,8 @@
-"""PDF ingestion module."""
+"""PDF ingestion module.
+
+This module orchestrates the ingestion: it lists the incoming PDF files, saves them as
+documents and processes them.
+"""
 
 from uuid import UUID
 from pathlib import Path
@@ -6,6 +10,8 @@ import logging
 
 from docflow.db import get_session
 from docflow.db.models import Document, DocumentSourceType, DocumentStatus
+from docflow.config import settings
+from docflow.pdf.extraction import extract_text as extract_pdf_text
 
 from docflow.documents import (
     DOC_NOT_FOUND,
@@ -16,8 +22,9 @@ from docflow.documents import (
 
 
 # Messages
-PENDING_PDF_FILES_FOUND = "{} pending PDF files found"
+PENDING_PDF_FILES_FOUND = "{} pending PDF file(s) found"
 NO_FILE_PATH = "Document {} does not have a file path"
+FILE_NOT_FOUND = 'File path "{}" does not exist'
 ERROR_PROCESSING_DOC = "Error processing document {}: {}"
 PDF_FILE_MOVED = "PDF file moved from {} to {}"
 ERROR_MOVING_PDF_FILE = "Error moving file {} to {}: {}"
@@ -32,7 +39,7 @@ BATCH_PROCESSING_FAILED = "{} of {} document(s) failed to process: {}"
 logger = logging.getLogger(__name__)
 
 
-def get_incoming_pdf_file_paths(pending_dir: str) -> list[str]:
+def get_pending_pdf_file_paths(pending_dir: str) -> list[str]:
     """Get the absolute paths of the PDF files in the Pending directory.
 
     Args:
@@ -49,10 +56,10 @@ def get_incoming_pdf_file_paths(pending_dir: str) -> list[str]:
 
 
 def save_document_batch(db_url: str, pdf_file_paths: list[str]) -> list[str]:
-    """Save a batch of PDF documents to the database given their file paths.
+    """Save a batch of PDF documents to the Knowledge Database given their file paths.
 
     Args:
-        db_url: Database URL (e.g.
+        db_url: Knowledge Database URL (e.g.
             "postgresql+psycopg://user:password@localhost:5432/db").
         pdf_file_paths: Absolute paths of the PDF files.
 
@@ -89,6 +96,24 @@ def save_document_batch(db_url: str, pdf_file_paths: list[str]) -> list[str]:
     return doc_ids
 
 
+def _extract_pdf_text(doc: Document) -> str:
+    """Extract the text of a PDF document in Markdown format.
+
+    Args:
+        doc: PDF document.
+
+    Returns:
+        Document text in Markdown format.
+    """
+    if not doc.source_file_path:
+        raise ValueError(NO_FILE_PATH.format(doc.id))
+
+    if not Path(doc.source_file_path).exists():
+        raise ValueError(FILE_NOT_FOUND.format(doc.source_file_path))
+
+    return extract_pdf_text(settings.pdf_extraction_models_path, doc.source_file_path)
+
+
 def process_document_batch(
     db_url: str,
     doc_ids: list[str],
@@ -98,7 +123,7 @@ def process_document_batch(
     """Process a batch of existing PDF documents.
 
     Args:
-        db_url: Database URL (e.g.
+        db_url: Knowledge Database URL (e.g.
             "postgresql+psycopg://user:password@localhost:5432/db").
         doc_ids: IDs of the PDF documents to process.
         processed_dir: Absolute path of the Processed directory.
@@ -132,7 +157,7 @@ def process_document_batch(
                 pending_name = pending_path.name
 
                 # Process the document
-                process_document(session, id)
+                process_document(session, id, _extract_pdf_text)
 
                 # Set the destination path to the Processed directory
                 destination_path = Path(processed_dir) / pending_name

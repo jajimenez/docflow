@@ -1,4 +1,8 @@
-"""Module for processing PDF files."""
+"""PDF extraction module.
+
+This module contains the low-level text extraction from PDF files, using the Docling
+library.
+"""
 
 from pathlib import Path
 

@@ -18,7 +18,6 @@ from sqlalchemy import (
     text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 
 from docflow.db.types import Vector
 
@@ -90,11 +89,6 @@ class Document(SQLModel, table=True):
     )
 
     title: str = Field(min_length=1, max_length=200)
-
-    # Flexible storage for source-specific metadata
-    extra_metadata: dict | None = Field(
-        default=None, sa_column=Column(JSONB, nullable=True)
-    )
 
     status: DocumentStatus = Field(
         sa_column=Column(
