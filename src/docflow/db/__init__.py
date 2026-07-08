@@ -1,4 +1,4 @@
-"""Database module."""
+"""Knowledge Database module."""
 
 from sqlmodel import create_engine, Session
 from sqlalchemy.engine import Engine
@@ -12,7 +12,7 @@ def get_engine(db_url: str) -> Engine:
     """Get or create a database engine.
 
     Args:
-        db_url: Database URL (e.g.
+        db_url: Knowledge Database URL (e.g.
             "postgresql+psycopg://user:password@localhost:5432/db").
 
     Returns:
@@ -28,7 +28,7 @@ def get_session(db_url: str) -> Session:
     """Get or create a database session.
 
     Args:
-        db_url: Database URL (e.g.
+        db_url: Knowledge Database URL (e.g.
             "postgresql+psycopg://user:password@localhost:5432/db")."
 
     Returns:

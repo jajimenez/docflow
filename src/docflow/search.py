@@ -20,7 +20,7 @@ def get_most_similar_chunks(
     """Get the most similar document chunks to a text.
 
     Args:
-        db_url: Documents database URL (e.g.
+        db_url: Knowledge Database URL (e.g.
             "postgresql+psycopg://user:password@localhost:5432/db").
         api_url: Ollama embedding API URL (e.g.
             "http://localhost:11434/api/embeddings").

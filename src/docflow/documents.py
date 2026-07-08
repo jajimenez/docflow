@@ -2,12 +2,11 @@
 
 import logging
 from uuid import UUID
-from pathlib import Path
+from typing import Callable
 
 from sqlmodel import Session, select
 
 from docflow.db.models import Document, DocumentStatus, DocumentChunk
-from docflow.pdf import extract_text as extract_pdf_text
 from docflow.text import split_text
 from docflow.text import get_embedding
 from docflow.config import settings
@@ -32,13 +31,16 @@ def get_document(
     session: Session,
     id: UUID | None = None,
     source_file_path: str | None = None,
+    source_url: str | None = None,
 ) -> Document | None:
-    """Get a document by its ID or its file path (if it's a PDF file).
+    """Get a document by its ID, its file path (if it's a PDF file) or its source URL
+    (if it comes from a remote source such as Confluence).
 
     Args:
         session: Database session.
         id: Document ID (optional).
         source_file_path: Document source file path (optional).
+        source_url: Document source URL (optional).
 
     Returns:
         Document if found or None otherwise.
@@ -49,8 +51,12 @@ def get_document(
         stmt = stmt.where(Document.id == id)
     elif source_file_path is not None:
         stmt = stmt.where(Document.source_file_path == source_file_path)
+    elif source_url is not None:
+        stmt = stmt.where(Document.source_url == source_url)
     else:
-        raise ValueError('Either "id" or "source_file_path" must be provided.')
+        raise ValueError(
+            'Either "id", "source_file_path" or "source_url" must be provided.'
+        )
 
     return session.exec(stmt).first()
 
@@ -102,57 +108,26 @@ def save_document(session: Session, doc: Document) -> UUID:
     return doc.id  # type: ignore
 
 
-# TO-DO
-def extract_text(doc: Document) -> str:
-    """Extract the text of a document.
-
-    Args:
-        doc: Document to extract the text from.
-
-    Returns:
-        Document text in Markdown format.
-    """
-    if doc.source_type == "pdf":
-        if not doc.source_file_path:
-            message = f'Document "{doc.id}" does not have a file path'
-            logger.error(message)
-
-            raise ValueError(message)
-
-        if not Path(doc.source_file_path).exists():
-            message = f'File path "{doc.source_file_path}" does not exist'
-            logger.error(message)
-
-            raise ValueError(message)
-
-        return extract_pdf_text(settings.pdf_extraction_models_path, doc.source_file_path)
-    elif doc.source_type == "github":
-        raise NotImplementedError("Text extraction from GitHub is not implemented yet")
-    elif doc.source_type == "azure_devops":
-        raise NotImplementedError(
-            "Text extraction from Azure DevOps is not implemented yet"
-        )
-    elif doc.source_type == "confluence":
-        raise NotImplementedError(
-            "Text extraction from Confluence is not implemented yet"
-        )
-    else:
-        message = f'Unknown source type "{doc.source_type}" for document "{doc.id}"'
-        logger.error(message)
-
-        raise ValueError(message)
-
-
-def process_document(session: Session, doc_id: UUID):
+def process_document(
+    session: Session,
+    doc_id: UUID,
+    extract_text: Callable[[Document], str],
+):
     """Process an existing document.
 
     When this function starts, the status of the document is set to Processing. When
     this function ends, the status is set to Processed. If an exception occurs during
     the processing, the status is set to Failed.
 
+    The text extraction is delegated to the ``extract_text`` callable, which receives the
+    document and returns its text in Markdown format. This keeps this generic pipeline
+    decoupled from any source-specific logic or credentials: each source (PDF,
+    Confluence, etc.) provides its own extractor with the appropriate configuration.
+
     Args:
         session: Database session.
         doc_id: ID of the document to process.
+        extract_text: Callable that extracts the text (Markdown) of the document.
     """
     # Get the document from the database
     doc = session.get(Document, doc_id)

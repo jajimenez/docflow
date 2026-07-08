@@ -70,13 +70,13 @@ airflow connections add knowledge_db \
     --conn-password "$DOCFLOW_KNOWLEDGE_DB_PASSWORD" \
     --conn-port "${DOCFLOW_KNOWLEDGE_DB_PORT:-5432}" \
     --conn-schema "$DOCFLOW_KNOWLEDGE_DB_NAME" \
-    --conn-description "Knowledge base PostgreSQL database"
+    --conn-description "Knowledge Database"
 
 # Create Airflow variables
 echo "Creating Airflow variables..."
-airflow variables set DOCFLOW_PDF_PENDING_DIR "$DOCFLOW_PDF_PENDING_DIR"
-airflow variables set DOCFLOW_PDF_PROCESSED_DIR "$DOCFLOW_PDF_PROCESSED_DIR"
-airflow variables set DOCFLOW_PDF_FAILED_DIR "$DOCFLOW_PDF_FAILED_DIR"
+airflow variables set docflow_pdf_pending_dir "$DOCFLOW_PDF_PENDING_DIR"
+airflow variables set docflow_pdf_processed_dir "$DOCFLOW_PDF_PROCESSED_DIR"
+airflow variables set docflow_pdf_failed_dir "$DOCFLOW_PDF_FAILED_DIR"
 
 # Seed the SimpleAuthManager password file with a known development password.
 # Airflow 3 uses SimpleAuthManager by default; it stores passwords in

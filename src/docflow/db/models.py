@@ -18,7 +18,6 @@ from sqlalchemy import (
     text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 
 from docflow.db.types import Vector
 
@@ -47,9 +46,9 @@ class DocumentSourceType(str, Enum):
     """Document source type."""
 
     pdf = "pdf"
-    GITHUB = "github"
-    AZURE_DEVOPS = "azure_devops"
-    CONFLUENCE = "confluence"
+    github = "github"
+    azure_devops = "azure_devops"
+    confluence = "confluence"
 
 
 class Document(SQLModel, table=True):
@@ -91,11 +90,6 @@ class Document(SQLModel, table=True):
 
     title: str = Field(min_length=1, max_length=200)
 
-    # Flexible storage for source-specific metadata
-    extra_metadata: dict | None = Field(
-        default=None, sa_column=Column(JSONB, nullable=True)
-    )
-
     status: DocumentStatus = Field(
         sa_column=Column(
             SaEnum(DocumentStatus, name="document_status"),
@@ -130,12 +124,16 @@ class Document(SQLModel, table=True):
         # Enforce the mutual exclusivity between source_file_path and source_url:
         #   - PDF documents must have a source_file_path and no source_url.
         #   - Remote documents must have a source_url and no source_file_path.
-        # This guarantees source_file_path is never null for PDF documents and source_url is
-        # never null for remote sources.
+        # This guarantees source_file_path is never null for PDF documents and
+        # source_url is never null for remote sources.
         CheckConstraint(
-            "(source_type = 'pdf' AND source_file_path IS NOT NULL AND source_url IS NULL)"
+            "(source_type = 'pdf' "
+            "AND source_file_path IS NOT NULL "
+            "AND source_url IS NULL)"
             " OR "
-            "(source_type != 'pdf' AND source_url IS NOT NULL AND source_file_path IS NULL)",
+            "(source_type != 'pdf' "
+            "AND source_url IS NOT NULL "
+            "AND source_file_path IS NULL)",
             name="check_document_source_fields",
         ),
     )

@@ -1,4 +1,4 @@
-"""Database setup module."""
+"""Knowledge Database setup module."""
 
 from textwrap import dedent
 
@@ -59,12 +59,12 @@ def create_triggers(engine: Engine):
 
 
 def set_up(db_url: str):
-    """Set up the database.
+    """Set up the Knowledge Database.
 
     This function creates the database tables if they don't exist.
 
     Args:
-        db_url: Database URL (e.g.
+        db_url: Knowledge Database URL (e.g.
             "postgresql+psycopg://user:password@localhost:5432/db").
     """
     engine = get_engine(db_url)

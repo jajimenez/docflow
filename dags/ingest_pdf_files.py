@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 
 from airflow.sdk import dag, task, Variable, PokeReturnValue
 
+from common import get_db_url
+
 
 # We place all posible imports in the task functions to keep the DAG parsing fast
 
@@ -32,17 +34,9 @@ def ingest_pdf_files():
     @task(task_id="set_up_database", retries=RETRIES, retry_delay=RETRY_DELAY)
     def set_up_db():
         """Set up the database."""
-        from airflow.sdk import Connection
         from docflow.db.setup import set_up
 
-        conn = Connection.get("knowledge_db")
-
-        db_url = (
-            f"postgresql+psycopg://{conn.login}:{conn.password}@{conn.host}:{conn.port}"
-            f"/{conn.schema}"
-        )
-
-        set_up(db_url)
+        set_up(get_db_url())
 
     @task.sensor(
         task_id="wait_for_pdf_files",
@@ -58,10 +52,10 @@ def ingest_pdf_files():
         Returns:
             PokeReturnValue with the absolute file paths when files are found.
         """
-        from docflow.ingestion.pdf import get_incoming_pdf_file_paths
+        from docflow.pdf.ingestion import get_pending_pdf_file_paths
 
-        pending_dir = Variable.get("DOCFLOW_PDF_PENDING_DIR")
-        paths = get_incoming_pdf_file_paths(pending_dir)
+        pending_dir = Variable.get("docflow_pdf_pending_dir")
+        paths = get_pending_pdf_file_paths(pending_dir)
 
         return PokeReturnValue(is_done=len(paths) > 0, xcom_value=paths)
 
@@ -79,17 +73,9 @@ def ingest_pdf_files():
         Returns:
             Document IDs.
         """
-        from airflow.sdk import Connection
-        from docflow.ingestion.pdf import save_document_batch
+        from docflow.pdf.ingestion import save_document_batch
 
-        conn = Connection.get("knowledge_db")
-
-        db_url = (
-            f"postgresql+psycopg://{conn.login}:{conn.password}"
-            f"@{conn.host}:{conn.port}/{conn.schema}"
-        )
-
-        return save_document_batch(db_url, pdf_file_paths)
+        return save_document_batch(get_db_url(), pdf_file_paths)
 
     @task(
         task_id="process_documents",
@@ -105,28 +91,20 @@ def ingest_pdf_files():
         Args:
             doc_ids: Document IDs.
         """
-        from airflow.sdk import Connection
-        from docflow.ingestion.pdf import process_document_batch
+        from docflow.pdf.ingestion import process_document_batch
 
-        conn = Connection.get("knowledge_db")
+        processed_dir = Variable.get("docflow_pdf_processed_dir")
+        failed_dir = Variable.get("docflow_pdf_failed_dir")
 
-        db_url = (
-            f"postgresql+psycopg://{conn.login}:{conn.password}"
-            f"@{conn.host}:{conn.port}/{conn.schema}"
-        )
-
-        processed_dir = Variable.get("DOCFLOW_PDF_PROCESSED_DIR")
-        failed_dir = Variable.get("DOCFLOW_PDF_FAILED_DIR")
-
-        process_document_batch(db_url, doc_ids, processed_dir, failed_dir)
+        process_document_batch(get_db_url(), doc_ids, processed_dir, failed_dir)
 
     # Task dependencies
     db_setup = set_up_db()
     doc_paths = wait_for_pdf_files()
     doc_ids = save_documents(doc_paths)  # type: ignore
-    doc_proc = process_documents(doc_ids)  # type: ignore
+    process_documents(doc_ids)  # type: ignore
 
-    db_setup >> doc_paths >> doc_ids >> doc_proc  # type: ignore
+    db_setup >> doc_paths  # type: ignore
 
 
 dag = ingest_pdf_files()
