@@ -1,12 +1,8 @@
 """Confluence ingestion module.
 
-This module only orchestrates the ingestion: it lists the pages of a space, saves them
-as documents and processes them.
-
-This module contains the logic to ingest the pages of a Confluence space into the
-knowledge database. It mirrors the PDF ingestion module: it fetches the pages of a
-space, saves them as documents and processes them (text extraction, chunking and
-embedding generation).
+This module contains the logic to ingest the pages of one or more Confluence spaces
+into the knowledge database: it fetches the pages of a space, saves them as documents
+and processes them (text extraction, chunking and embedding generation).
 
 The functions in this module are intentionally Airflow-agnostic: they receive plain
 values (database URL, Confluence URL, credentials, etc.) so that the credentials and
@@ -116,9 +112,9 @@ def process_document(
     verify_ssl: bool = True,
     cloud: bool = False,
 ):
-    """Process a single Confluence document: download, convert, chunk and embed.
+    """Process a Confluence document.
 
-    Downloads the document's page from Confluence and converts it to Markdown, splits it
+    Downloads the document's page from Confluence, converts it to Markdown, splits it
     into chunks and generates their embeddings. The Confluence credentials are passed in
     so that the page is downloaded from the right host, which allows ingesting multiple
     Confluence instances.
@@ -146,7 +142,7 @@ def process_document(
             doc = get_document(session, id=id)
 
             if not doc:
-                raise ValueError(DOC_NOT_FOUND)
+                raise ValueError(DOC_NOT_FOUND.format(doc_id))
 
             if not doc.source_url:
                 raise ValueError(NO_SOURCE_URL.format(doc.id))
@@ -155,7 +151,7 @@ def process_document(
                 session,
                 id,
                 lambda d: extract_text(
-                    d.source_url,  # type: ignore - Page URL
+                    d.source_url,  # type: ignore
                     base_url,
                     username,
                     password,
@@ -165,7 +161,6 @@ def process_document(
                 )
             )
         except Exception as e:
-            # Log the error for this specific document and re-raise so the caller can
-            # mark this attempt as failed (and retry it).
+            # Log the error and re-raise so the caller can mark this attempt as failed
             logger.error(ERROR_PROCESSING_DOC.format(doc_id, e))
             raise

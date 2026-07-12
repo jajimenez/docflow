@@ -7,7 +7,7 @@ from airflow.sdk import dag, task, Variable, PokeReturnValue
 from common import get_db_url, MAX_ACTIVE_PROCESSING_TASKS
 
 
-# We place all posible imports in the task functions to keep the DAG parsing fast
+# We place all possible imports in the task functions to keep the DAG parsing fast
 
 RETRIES = 3
 RETRY_DELAY = timedelta(minutes=5)
@@ -22,7 +22,7 @@ RETRY_DELAY = timedelta(minutes=5)
     tags=["docflow", "PDF"],
 )
 def ingest_pdf_files():
-    """DAG to ingest PDF files from the file system and process them.
+    """DAG to ingest PDF files from the file system.
 
     This DAG continuously checks for PDF files in the Pending directory of the file
     system. When new PDF files are found, it saves them to the database and processes
@@ -103,14 +103,14 @@ def ingest_pdf_files():
         # Only move the file to the Failed directory once all tries have been made, so
         # that intermediate tries can still find it in the Pending directory.
         ti = get_current_context()["ti"]  # type: ignore
-        last_attempt = ti.try_number > ti.max_tries
+        is_last_attempt = ti.try_number > ti.max_tries
 
         ingestion.process_document(
             get_db_url(),
             doc_id,
             processed_dir,
             failed_dir,
-            last_attempt=last_attempt,
+            is_last_attempt=is_last_attempt,
         )
 
     # Task dependencies

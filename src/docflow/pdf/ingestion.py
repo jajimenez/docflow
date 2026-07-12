@@ -94,6 +94,9 @@ def save_document_batch(db_url: str, pdf_file_paths: list[str]) -> list[str]:
 def _move_file(src: Path, dest: Path) -> None:
     """Move a file.
 
+    Any error while moving the file is logged and not re-raised, so that it does not
+    mask the outcome of the document processing.
+
     Args:
         src: Absolute path of the source file.
         dest: Absolute path of the destination file.
@@ -115,7 +118,7 @@ def process_document(
     doc_id: str,
     processed_dir: str,
     failed_dir: str,
-    last_attempt: bool = True,
+    is_last_attempt: bool = True,
 ):
     """Process a PDF document.
 
@@ -131,9 +134,9 @@ def process_document(
         doc_id: ID of the PDF document to process.
         processed_dir: Absolute path of the Processed directory.
         failed_dir: Absolute path of the Failed directory.
-        last_attempt: Whether this is the last processing attempt. When True, a failed
-            file is moved to the Failed directory; otherwise it is left in the Pending
-            directory so that a retry can find it.
+        is_last_attempt: Whether this is the last processing attempt. When True, a
+            failed file is moved to the Failed directory; otherwise it is left in the
+            Pending directory so that a retry can find it.
 
     Raises:
         Exception: If the document could not be processed. The exception is re-raised so
@@ -152,7 +155,7 @@ def process_document(
             doc = get_document(session, id=id)
 
             if not doc:
-                raise ValueError(DOC_NOT_FOUND)
+                raise ValueError(DOC_NOT_FOUND.format(doc_id))
 
             if not doc.source_file_path:
                 raise ValueError(NO_FILE_PATH.format(doc.id))
@@ -176,15 +179,15 @@ def process_document(
             # directory.
             destination_path = Path(processed_dir) / pending_path.name
         except Exception as e:
-            # Log the error for this specific document
+            # Log the error
             logger.error(ERROR_PROCESSING_DOC.format(doc_id, e))
 
             # Only move the file to the Failed directory on the last attempt, so that
             # intermediate retries can still find it in the Pending directory.
-            if last_attempt and pending_path is not None:
+            if is_last_attempt and pending_path is not None:
                 destination_path = Path(failed_dir) / pending_path.name
 
-            # Re-raise so the caller can mark this attempt as failed (and retry it).
+            # Re-raise so the caller can mark this attempt as failed
             raise
         finally:
             if pending_path is not None and destination_path is not None:

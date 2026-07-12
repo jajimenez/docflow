@@ -16,7 +16,7 @@ from docflow.config import settings
 DOC_CREATED = "Document {} created"
 DOC_UPDATED = "Document {} updated"
 DOC_NOT_FOUND = "Document {} not found"
-PROCCESSING_DOC = "Processing document {}..."
+PROCESSING_DOC = "Processing document {}..."
 EXTRACTING_TEXT = "Extracting text from document {}..."
 SPLITTING_TEXT = "Splitting text of document {} into chunks..."
 GEN_EMBEDDINGS = "Generating embeddings of text chunks of document {}..."
@@ -34,7 +34,7 @@ def get_document(
     source_url: str | None = None,
 ) -> Document | None:
     """Get a document by its ID, its file path (if it's a PDF file) or its source URL
-    (if it comes from a remote source such as Confluence).
+    (if it comes from a remote source such as Confluence or Azure DevOps).
 
     Args:
         session: Database session.
@@ -148,7 +148,7 @@ def process_document(
         # Set the status to Processing
         doc.status = DocumentStatus.processing
         session.commit()
-        logger.info(PROCCESSING_DOC.format(doc.id))
+        logger.info(PROCESSING_DOC.format(doc.id))
 
         # Delete existing chunks (via a copy with "list" to avoid modifying the
         # collection while iterating over it).

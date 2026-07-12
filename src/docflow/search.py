@@ -1,4 +1,4 @@
-"""Search module."""
+"""Semantic search over document chunks."""
 
 from sqlalchemy import text as _text
 from sqlalchemy.orm import selectinload
@@ -28,6 +28,10 @@ def get_most_similar_chunks(
         model: Embedding model to use.
         text: Text to search for.
         limit: Maximum number of chunks to return.
+
+    Returns:
+        List of the most similar document chunks, sorted by similarity (most similar
+        first).
     """
     # Validate limit
     if not isinstance(limit, int) or limit < 1 or limit > 1000:
