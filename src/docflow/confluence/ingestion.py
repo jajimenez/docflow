@@ -1,12 +1,8 @@
 """Confluence ingestion module.
 
-This module only orchestrates the ingestion: it lists the pages of a space, saves them
-as documents and processes them.
-
-This module contains the logic to ingest the pages of a Confluence space into the
-knowledge database. It mirrors the PDF ingestion module: it fetches the pages of a
-space, saves them as documents and processes them (text extraction, chunking and
-embedding generation).
+This module contains the logic to ingest the pages of one or more Confluence spaces
+into the knowledge database: it fetches the pages of a space, saves them as documents
+and processes them (text extraction, chunking and embedding generation).
 
 The functions in this module are intentionally Airflow-agnostic: they receive plain
 values (database URL, Confluence URL, credentials, etc.) so that the credentials and
@@ -23,26 +19,20 @@ import logging
 
 from docflow.db import get_session
 from docflow.db.models import Document, DocumentSourceType, DocumentStatus
-
 from docflow.confluence.auth import get_client
-
-from docflow.confluence.extraction import (
-    get_space_pages,
-    get_page_url,
-    extract_text as extract_confluence_text,
-)
+from docflow.confluence.extraction import get_space_pages, get_page_url, extract_text
 
 from docflow.documents import (
+    DOC_NOT_FOUND,
     get_document,
     save_document,
-    process_document,
+    process_document as process_document_pipeline,
 )
 
 
 # Messages
 NO_SOURCE_URL = "Document {} does not have a source URL"
 ERROR_PROCESSING_DOC = "Error processing document {}: {}"
-BATCH_PROCESSING_FAILED = "{} of {} document(s) failed to process: {}"
 
 # Logger
 logger = logging.getLogger(__name__)
@@ -112,9 +102,9 @@ def save_document_batch(
     return doc_ids
 
 
-def process_document_batch(
+def process_document(
     db_url: str,
-    doc_ids: list[str],
+    doc_id: str,
     base_url: str,
     username: str | None = None,
     password: str | None = None,
@@ -122,18 +112,17 @@ def process_document_batch(
     verify_ssl: bool = True,
     cloud: bool = False,
 ):
-    """Process a batch of existing Confluence documents.
+    """Process a Confluence document.
 
-    For each document, its page is downloaded from Confluence and converted to Markdown,
-    split into chunks and embedded. The Confluence credentials are passed in so that each
-    batch is processed against the right host, which allows ingesting multiple Confluence
-    instances. If one or more documents fail to process, the others are still processed
-    and a ``RuntimeError`` is raised at the end.
+    Downloads the document's page from Confluence, converts it to Markdown, splits it
+    into chunks and generates their embeddings. The Confluence credentials are passed in
+    so that the page is downloaded from the right host, which allows ingesting multiple
+    Confluence instances.
 
     Args:
         db_url: Knowledge Database URL (e.g.
             "postgresql+psycopg://user:password@localhost:5432/db").
-        doc_ids: IDs of the Confluence documents to process.
+        doc_id: ID of the Confluence document to process.
         base_url: Base URL of the Confluence instance (e.g.
             "https://confluence.example.com").
         username: User name for basic authentication (optional).
@@ -142,37 +131,36 @@ def process_document_batch(
         verify_ssl: Whether to verify the TLS certificate of the server.
         cloud: Whether the instance is Confluence Cloud (True) or Server/Data Center
             (False).
+
+    Raises:
+        Exception: If the document could not be processed. The exception is re-raised so
+            that the caller (e.g. an Airflow task) can mark the attempt as failed.
     """
-
-    def extract(doc: Document) -> str:
-        if not doc.source_url:
-            raise ValueError(NO_SOURCE_URL.format(doc.id))
-
-        return extract_confluence_text(
-            doc.source_url,  # Page URL
-            base_url,
-            username,
-            password,
-            token,
-            verify_ssl,
-            cloud,
-        )
-
-    failed_ids: list[str] = []
-
     with get_session(db_url) as session:
-        for i in doc_ids:
-            try:
-                id = UUID(i)
-                process_document(session, id, extract)
-            except Exception as e:
-                # Log the error for this specific document and continue with the rest
-                logger.error(ERROR_PROCESSING_DOC.format(i, e))
-                failed_ids.append(i)
+        try:
+            id = UUID(doc_id)
+            doc = get_document(session, id=id)
 
-    if failed_ids:
-        raise RuntimeError(
-            BATCH_PROCESSING_FAILED.format(
-                len(failed_ids), len(doc_ids), ", ".join(failed_ids)
+            if not doc:
+                raise ValueError(DOC_NOT_FOUND.format(doc_id))
+
+            if not doc.source_url:
+                raise ValueError(NO_SOURCE_URL.format(doc.id))
+
+            process_document_pipeline(
+                session,
+                id,
+                lambda d: extract_text(
+                    d.source_url,  # type: ignore
+                    base_url,
+                    username,
+                    password,
+                    token,
+                    verify_ssl,
+                    cloud,
+                )
             )
-        )
+        except Exception as e:
+            # Log the error and re-raise so the caller can mark this attempt as failed
+            logger.error(ERROR_PROCESSING_DOC.format(doc_id, e))
+            raise

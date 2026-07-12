@@ -46,7 +46,6 @@ class DocumentSourceType(str, Enum):
     """Document source type."""
 
     pdf = "pdf"
-    github = "github"
     azure_devops = "azure_devops"
     confluence = "confluence"
 

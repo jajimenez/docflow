@@ -25,11 +25,11 @@ def get_engine(db_url: str) -> Engine:
 
 
 def get_session(db_url: str) -> Session:
-    """Get or create a database session.
+    """Create a database session.
 
     Args:
         db_url: Knowledge Database URL (e.g.
-            "postgresql+psycopg://user:password@localhost:5432/db")."
+            "postgresql+psycopg://user:password@localhost:5432/db").
 
     Returns:
         SQLAlchemy database session.

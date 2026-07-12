@@ -61,7 +61,7 @@ def create_triggers(engine: Engine):
 def set_up(db_url: str):
     """Set up the Knowledge Database.
 
-    This function creates the database tables if they don't exist.
+    It creates the database functions, tables and triggers if they don't exist.
 
     Args:
         db_url: Knowledge Database URL (e.g.

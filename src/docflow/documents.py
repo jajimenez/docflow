@@ -16,7 +16,7 @@ from docflow.config import settings
 DOC_CREATED = "Document {} created"
 DOC_UPDATED = "Document {} updated"
 DOC_NOT_FOUND = "Document {} not found"
-PROCCESSING_DOC = "Processing document {}..."
+PROCESSING_DOC = "Processing document {}..."
 EXTRACTING_TEXT = "Extracting text from document {}..."
 SPLITTING_TEXT = "Splitting text of document {} into chunks..."
 GEN_EMBEDDINGS = "Generating embeddings of text chunks of document {}..."
@@ -34,7 +34,7 @@ def get_document(
     source_url: str | None = None,
 ) -> Document | None:
     """Get a document by its ID, its file path (if it's a PDF file) or its source URL
-    (if it comes from a remote source such as Confluence).
+    (if it comes from a remote source such as Confluence or Azure DevOps).
 
     Args:
         session: Database session.
@@ -113,7 +113,12 @@ def process_document(
     doc_id: UUID,
     extract_text: Callable[[Document], str],
 ):
-    """Process an existing document.
+    """Process an existing document (generic, source-agnostic pipeline).
+
+    This is the shared core reused by the per-source ``process_document`` wrappers (in
+    ``docflow.pdf.ingestion`` and ``docflow.confluence.ingestion``): those wrappers add
+    only their source-specific bits (the extractor and any housekeeping, such as the PDF
+    file move) and delegate the common work to this function.
 
     When this function starts, the status of the document is set to Processing. When
     this function ends, the status is set to Processed. If an exception occurs during
@@ -143,7 +148,7 @@ def process_document(
         # Set the status to Processing
         doc.status = DocumentStatus.processing
         session.commit()
-        logger.info(PROCCESSING_DOC.format(doc.id))
+        logger.info(PROCESSING_DOC.format(doc.id))
 
         # Delete existing chunks (via a copy with "list" to avoid modifying the
         # collection while iterating over it).

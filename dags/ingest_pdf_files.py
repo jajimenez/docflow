@@ -4,10 +4,10 @@ from datetime import datetime, timedelta
 
 from airflow.sdk import dag, task, Variable, PokeReturnValue
 
-from common import get_db_url
+from common import get_db_url, MAX_ACTIVE_PROCESSING_TASKS
 
 
-# We place all posible imports in the task functions to keep the DAG parsing fast
+# We place all possible imports in the task functions to keep the DAG parsing fast
 
 RETRIES = 3
 RETRY_DELAY = timedelta(minutes=5)
@@ -22,7 +22,7 @@ RETRY_DELAY = timedelta(minutes=5)
     tags=["docflow", "PDF"],
 )
 def ingest_pdf_files():
-    """DAG to ingest PDF files from the file system and process them.
+    """DAG to ingest PDF files from the file system.
 
     This DAG continuously checks for PDF files in the Pending directory of the file
     system. When new PDF files are found, it saves them to the database and processes
@@ -78,31 +78,46 @@ def ingest_pdf_files():
         return save_document_batch(get_db_url(), pdf_file_paths)
 
     @task(
-        task_id="process_documents",
+        task_id="process_document",
         retries=RETRIES,
         retry_delay=RETRY_DELAY,
+        max_active_tis_per_dagrun=MAX_ACTIVE_PROCESSING_TASKS,
     )
-    def process_documents(doc_ids: list[str]):
-        """Process the PDF documents.
+    def process_document(doc_id: str):
+        """Process a PDF document.
 
-        Extracts text, generates embeddings, and moves each PDF file to the Processed or
-        Failed directory depending on the outcome.
+        Extracts text, generates embeddings, and moves the PDF file to the Processed or
+        Failed directory depending on the outcome. This task is dynamically mapped over
+        the saved documents, so each PDF file is processed by its own task instance,
+        giving per-file success/failure tracking and independent retries.
 
         Args:
-            doc_ids: Document IDs.
+            doc_id: Document ID.
         """
-        from docflow.pdf.ingestion import process_document_batch
+        from airflow.sdk import get_current_context
+        from docflow.pdf import ingestion
 
         processed_dir = Variable.get("docflow_pdf_processed_dir")
         failed_dir = Variable.get("docflow_pdf_failed_dir")
 
-        process_document_batch(get_db_url(), doc_ids, processed_dir, failed_dir)
+        # Only move the file to the Failed directory once all tries have been made, so
+        # that intermediate tries can still find it in the Pending directory.
+        ti = get_current_context()["ti"]  # type: ignore
+        is_last_attempt = ti.try_number > ti.max_tries
+
+        ingestion.process_document(
+            get_db_url(),
+            doc_id,
+            processed_dir,
+            failed_dir,
+            is_last_attempt=is_last_attempt,
+        )
 
     # Task dependencies
     db_setup = set_up_db()
     doc_paths = wait_for_pdf_files()
     doc_ids = save_documents(doc_paths)  # type: ignore
-    process_documents(doc_ids)  # type: ignore
+    process_document.expand(doc_id=doc_ids)
 
     db_setup >> doc_paths  # type: ignore
 

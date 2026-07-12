@@ -25,6 +25,44 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Install any corporate/custom CA certificates into the system trust store. On networks
+# with a TLS-inspecting proxy (e.g. corporate environments), the proxy resigns HTTPS
+# with a private root CA. Without trusting it, the Docling model download from the
+# Hugging Face CDN fails with CERTIFICATE_VERIFY_FAILED or, via the hf_xet client, hangs
+# forever at "Fetching N files: X%". Place PEM-encoded *.crt files into
+# ./devcontainer/certificates (git-ignored), which is a no-op on networks without such a
+# proxy (empty directory).
+COPY .devcontainer/certificates/ /usr/local/share/ca-certificates/extra/
+RUN update-ca-certificates
+
+# Some TLS-inspecting proxies (e.g. corporate ones) issue certificates that omit the
+# Authority Key Identifier extension and therefore do not comply with RFC 5280. Python
+# 3.13+ enables ssl.VERIFY_X509_STRICT by default and rejects such chains with
+# "CERTIFICATE_VERIFY_FAILED: Missing Authority Key Identifier". This shim, applied only
+# to the models download step below via PYTHONPATH (not at runtime), relaxes that one
+# strict check while still fully verifying against the CA store.
+RUN mkdir -p /opt/ssl-shim && \
+    printf '%s\n' \
+        'import ssl' \
+        '_orig = ssl.create_default_context' \
+        'def _patched(*args, **kwargs):' \
+        '    ctx = _orig(*args, **kwargs)' \
+        '    ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT' \
+        '    return ctx' \
+        'ssl.create_default_context = _patched' \
+        > /opt/ssl-shim/sitecustomize.py
+
+# Point TLS clients (requests/httpx used by huggingface_hub and curl) at the system
+# trust store so they pick up the CA certificates installed above.
+ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+
+# The Hugging Face Xet back-end (hf_xet) does not respect the CA bundle above and hangs
+# indefinitely behind a TLS-inspecting proxy. Force the classic HTTPS download path,
+# which respects the trust store and completes reliably.
+ENV HG_HUB_DISABLE_XET=1
+
 # Tell Docling where to find Tesseract's language data files
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
 
@@ -41,8 +79,9 @@ USER airflow
 # installed in editable mode later by postCreateCommand.
 RUN pip install --no-cache-dir "docling[tesserocr]>=2.108.0,<2.109.0"
 
-# Download Docling models into the image so postCreateCommand doesn't need to.
-RUN docling-tools models download layout tableformer
+# Download Docling models. PYTHONPATH loads the strict-verification shim for this
+# command only, so runtime TLS remains strict.
+RUN PYTHONPATH=/opt/ssl-shim docling-tools models download layout tableformer
 
 # Clear the Airflow entrypoint so VS Code can attach to this container as a dev container
 ENTRYPOINT []
