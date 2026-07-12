@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from airflow.sdk import dag, task, Variable
 
-from common import get_db_url
+from common import get_db_url, MAX_ACTIVE_PROCESSING_TASKS
 
 
 # We place all possible imports in the task functions to keep the DAG parsing fast
@@ -85,14 +85,17 @@ def ingest_confluence_pages():
     hosts, each with its own credentials. For example:
 
         [
-            {"conn_id": "confluence_a", "space_key": "ENG"},
-            {"conn_id": "confluence_a", "space_key": "OPS"},
-            {"conn_id": "confluence_b", "space_key": "DOCS"}
+            {"conn_id": "confluence_a", "space_key": "a"},
+            {"conn_id": "confluence_a", "space_key": "b"},
+            {"conn_id": "confluence_b", "space_key": "c"}
         ]
 
     Each target is processed independently and in parallel (via dynamic task mapping):
-    its pages are fetched, saved to the database and processed (converting the page
-    content to text, splitting it into chunks and generating embeddings).
+    its pages are fetched and saved to the database. The saved pages of all targets are
+    then flattened into a single list and processed in parallel, one mapped task
+    instance per page (converting the page content to text, splitting it into chunks and
+    generating embeddings), giving per-page success/failure tracking and independent
+    retries.
 
     Authentication is optional per target: if a connection has no credentials, the DAG
     connects to that Confluence host anonymously.
@@ -152,33 +155,64 @@ def ingest_confluence_pages():
 
         return {"conn_id": target["conn_id"], "doc_ids": doc_ids}
 
-    @task(task_id="process_documents", retries=RETRIES, retry_delay=RETRY_DELAY)
-    def process_documents(docs: dict):
-        """Process the Confluence documents of a target.
+    @task(task_id="flatten_documents", retries=RETRIES, retry_delay=RETRY_DELAY)
+    def flatten_documents(docs: list[dict]) -> list[dict]:
+        """Flatten the per-space documents into a flat list of pages.
 
-        Converts the page content to text, generates embeddings and updates the status
-        of each document. The Confluence credentials are resolved from the target's
-        connection so that the pages are downloaded from the right host.
+        Airflow cannot map a task directly over the per-instance output of another
+        mapped task, so the saved documents of every space are collected here into a
+        single flat list, one object per page, so that the processing step can be mapped
+        over individual pages.
 
         Args:
-            docs: Object with the target's "conn_id" and its saved "doc_ids".
+            docs: One object per space, each with a "conn_id" and its saved "doc_ids".
+
+        Returns:
+            One object per page, each with a "conn_id" and a single "doc_id".
         """
-        from docflow.confluence.ingestion import process_document_batch
+        return [
+            {"conn_id": d["conn_id"], "doc_id": doc_id}
+            for d in docs
+            for doc_id in d["doc_ids"]
+        ]
 
-        options = _get_confluence_options(docs["conn_id"])
+    @task(
+        task_id="process_document",
+        retries=RETRIES,
+        retry_delay=RETRY_DELAY,
+        max_active_tis_per_dagrun=MAX_ACTIVE_PROCESSING_TASKS,
+    )
+    def process_document(page: dict):
+        """Process a Confluence page document.
 
-        process_document_batch(get_db_url(), docs["doc_ids"], **options)
+        Downloads the page content, converts it to text, generates embeddings and
+        updates the status of the document. The Confluence credentials are resolved from
+        the page's connection so that the page is downloaded from the right host. This
+        task is dynamically mapped over the flattened pages, so each page is processed
+        by its own task instance, giving per-page success/failure tracking and
+        independent retries.
 
-    # Task dependencies. "save_documents" and "process_documents" are dynamically mapped
-    # over the list of targets, so each target is handled by its own pair of tasks in
-    # parallel.
+        Args:
+            page: Object with the page's "conn_id" and "doc_id".
+        """
+        from docflow.confluence import ingestion
+
+        options = _get_confluence_options(page["conn_id"])
+
+        ingestion.process_document(get_db_url(), page["doc_id"], **options)
+
+    # Task dependencies. "save_documents" is dynamically mapped over the list of
+    # targets, so each space's pages are fetched and saved in parallel. The saved pages
+    # of all spaces are then flattened into a single list and "process_document" is
+    # mapped over it, so each page is processed by its own task instance in parallel.
     db_setup = set_up_db()
     targets = get_confluence_targets()
 
     db_setup >> targets  # type: ignore
 
     docs = save_documents.expand(target=targets)
-    process_documents.expand(docs=docs)
+    pages = flatten_documents(docs)  # type: ignore
+    process_document.expand(page=pages)
 
 
 dag = ingest_confluence_pages()

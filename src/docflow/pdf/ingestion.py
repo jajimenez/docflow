@@ -10,15 +10,16 @@ import logging
 
 from docflow.db import get_session
 from docflow.db.models import Document, DocumentSourceType, DocumentStatus
-from docflow.config import settings
-from docflow.pdf.extraction import extract_text as extract_pdf_text
+from docflow.pdf.extraction import extract_text
 
 from docflow.documents import (
     DOC_NOT_FOUND,
     get_document,
     save_document,
-    process_document,
+    process_document as process_document_pipeline,
 )
+
+from docflow.config import settings
 
 
 # Messages
@@ -26,14 +27,8 @@ PENDING_PDF_FILES_FOUND = "{} pending PDF file(s) found"
 NO_FILE_PATH = "Document {} does not have a file path"
 FILE_NOT_FOUND = 'File path "{}" does not exist'
 ERROR_PROCESSING_DOC = "Error processing document {}: {}"
-PDF_FILE_MOVED = "PDF file moved from {} to {}"
-ERROR_MOVING_PDF_FILE = "Error moving file {} to {}: {}"
-
-PDF_FILE_NOT_MOVED = (
-    "PDF file not moved: Pending and Processed paths could not be determined."
-)
-
-BATCH_PROCESSING_FAILED = "{} of {} document(s) failed to process: {}"
+FILE_MOVED = "File moved from {} to {}"
+ERROR_MOVING_FILE = "Error moving file {} to {}: {}"
 
 # Logger
 logger = logging.getLogger(__name__)
@@ -96,106 +91,101 @@ def save_document_batch(db_url: str, pdf_file_paths: list[str]) -> list[str]:
     return doc_ids
 
 
-def _extract_pdf_text(doc: Document) -> str:
-    """Extract the text of a PDF document in Markdown format.
+def _move_file(src: Path, dest: Path) -> None:
+    """Move a file.
 
     Args:
-        doc: PDF document.
-
-    Returns:
-        Document text in Markdown format.
+        src: Absolute path of the source file.
+        dest: Absolute path of the destination file.
     """
-    if not doc.source_file_path:
-        raise ValueError(NO_FILE_PATH.format(doc.id))
+    try:
+        # Create the destination directory if it doesn't exist
+        dest.parent.mkdir(parents=True, exist_ok=True)
 
-    if not Path(doc.source_file_path).exists():
-        raise ValueError(FILE_NOT_FOUND.format(doc.source_file_path))
+        # Move the source file to the destination directory
+        src.rename(dest)
+    except Exception as e:
+        logger.error(ERROR_MOVING_FILE.format(src, dest, e))
+    else:
+        logger.info(FILE_MOVED.format(src, dest))
 
-    return extract_pdf_text(settings.pdf_extraction_models_path, doc.source_file_path)
 
-
-def process_document_batch(
+def process_document(
     db_url: str,
-    doc_ids: list[str],
+    doc_id: str,
     processed_dir: str,
     failed_dir: str,
+    last_attempt: bool = True,
 ):
-    """Process a batch of existing PDF documents.
+    """Process a PDF document.
+
+    It extracts the text of the PDF file, splits it into chunks and generates their
+    embeddings, then moves the PDF file out of the Pending directory: to the Processed
+    directory on success, or to the Failed directory on failure. The file is only moved
+    to the Failed directory on the last attempt, so that intermediate retries can still
+    find it in the Pending directory.
 
     Args:
         db_url: Knowledge Database URL (e.g.
             "postgresql+psycopg://user:password@localhost:5432/db").
-        doc_ids: IDs of the PDF documents to process.
+        doc_id: ID of the PDF document to process.
         processed_dir: Absolute path of the Processed directory.
         failed_dir: Absolute path of the Failed directory.
+        last_attempt: Whether this is the last processing attempt. When True, a failed
+            file is moved to the Failed directory; otherwise it is left in the Pending
+            directory so that a retry can find it.
+
+    Raises:
+        Exception: If the document could not be processed. The exception is re-raised so
+            that the caller (e.g. an Airflow task) can mark the attempt as failed.
     """
-    failed_ids: list[str] = []
+    # Absolute path of the pending PDF file to process
+    pending_path: Path | None = None
+
+    # Absolute path where the file will be moved (either in the Processed or Failed
+    # directory, depending on the result of the processing).
+    destination_path: Path | None = None
 
     with get_session(db_url) as session:
-        for i in doc_ids:
-            # Absolute path of the pending PDF file to process
-            pending_path: Path | None = None
+        try:
+            id = UUID(doc_id)
+            doc = get_document(session, id=id)
 
-            # Name of the pending PDF file to process
-            pending_name: str | None = None
+            if not doc:
+                raise ValueError(DOC_NOT_FOUND)
 
-            # Absolute path where the processed file will be moved (either in the
-            # Processed or Failed directory, depending on the result of the processing).
-            destination_path: Path | None = None
+            if not doc.source_file_path:
+                raise ValueError(NO_FILE_PATH.format(doc.id))
 
-            try:
-                id = UUID(i)  # type: ignore
-                doc = get_document(session, id=id)
+            pending_path = Path(doc.source_file_path)
 
-                if doc is None:
-                    raise ValueError(DOC_NOT_FOUND)
+            if not pending_path.exists():
+                raise ValueError(FILE_NOT_FOUND.format(pending_path))
 
-                if not doc.source_file_path:
-                    raise ValueError(NO_FILE_PATH.format(doc.id))
+            # Process the document
+            process_document_pipeline(
+                session,
+                id,
+                lambda d: extract_text(
+                    settings.pdf_extraction_models_path,
+                    d.source_file_path,  # type: ignore
+                )
+            )
 
-                pending_path = Path(doc.source_file_path)
-                pending_name = pending_path.name
+            # The document was processed successfully: move it to the Processed
+            # directory.
+            destination_path = Path(processed_dir) / pending_path.name
+        except Exception as e:
+            # Log the error for this specific document
+            logger.error(ERROR_PROCESSING_DOC.format(doc_id, e))
 
-                # Process the document
-                process_document(session, id, _extract_pdf_text)
+            # Only move the file to the Failed directory on the last attempt, so that
+            # intermediate retries can still find it in the Pending directory.
+            if last_attempt and pending_path is not None:
+                destination_path = Path(failed_dir) / pending_path.name
 
-                # Set the destination path to the Processed directory
-                destination_path = Path(processed_dir) / pending_name
-            except Exception as e:
-                # Log the error for this specific document
-                logger.error(ERROR_PROCESSING_DOC.format(i, e))
-                failed_ids.append(i)
-
-                # Set the destination path to the Failed directory
-                if pending_name is not None:
-                    destination_path = Path(failed_dir) / pending_name
-            finally:
-                if pending_path is not None and destination_path is not None:
-                    try:
-                        # Create the destination directory if it doesn't exist
-                        destination_path.parent.mkdir(parents=True, exist_ok=True)
-
-                        # Move the pending file to the destination directory
-                        pending_path.rename(destination_path)
-                    except Exception as e:
-                        logger.error(
-                            ERROR_MOVING_PDF_FILE.format(
-                                pending_path, destination_path, e
-                            )
-                        )
-                    else:
-                        # The file was moved successfully
-                        logger.info(
-                            PDF_FILE_MOVED.format(pending_path, destination_path)
-                        )
-                else:
-                    # The file couldn't be moved because we couldn't determine the
-                    # pending and destination paths (the error occurred before the
-                    # document was retrieved from the database).
-                    logger.warning(PDF_FILE_NOT_MOVED)
-
-    if failed_ids:
-        raise RuntimeError(
-            BATCH_PROCESSING_FAILED
-            .format(len(failed_ids), len(doc_ids), ", ".join(failed_ids))
-        )
+            # Re-raise so the caller can mark this attempt as failed (and retry it).
+            raise
+        finally:
+            if pending_path is not None and destination_path is not None:
+                _move_file(pending_path, destination_path)

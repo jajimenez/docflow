@@ -113,7 +113,12 @@ def process_document(
     doc_id: UUID,
     extract_text: Callable[[Document], str],
 ):
-    """Process an existing document.
+    """Process an existing document (generic, source-agnostic pipeline).
+
+    This is the shared core reused by the per-source ``process_document`` wrappers (in
+    ``docflow.pdf.ingestion`` and ``docflow.confluence.ingestion``): those wrappers add
+    only their source-specific bits (the extractor and any housekeeping, such as the PDF
+    file move) and delegate the common work to this function.
 
     When this function starts, the status of the document is set to Processing. When
     this function ends, the status is set to Processed. If an exception occurs during

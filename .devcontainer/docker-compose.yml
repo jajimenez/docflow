@@ -12,6 +12,9 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__TEST_CONNECTION: "Enabled"
       AIRFLOW__API__EXPOSE_CONFIG: "true"  # In production, set to False
+      # Allow dynamically mapped tasks to expand into more than the default 1024
+      # instances (e.g. Confluence spaces with many pages).
+      AIRFLOW__CORE__MAX_MAP_LENGTH: "10000"
       # SimpleAuthManager is the default auth manager in Airflow 3. Declare the
       # admin user here; the password is seeded by airflow-init.sh into the file
       # below so it stays predictable across container rebuilds.
@@ -22,6 +25,7 @@ services:
       DOCFLOW_PDF_PROCESSED_DIR: "/workspace/docflow/pdf/processed"
       DOCFLOW_PDF_FAILED_DIR: "/workspace/docflow/pdf/failed"
       DOCFLOW_PDF_EXTRACTION_MODELS_PATH: "/home/airflow/.cache/docling/models"
+      DOCFLOW_MAX_ACTIVE_PROCESSING_TASKS: "4"
       DOCFLOW_EMBEDDINGS_API_URL: "http://ollama:11434/api/embeddings"
       DOCFLOW_KNOWLEDGE_DB_HOST: "knowledge-db"
       DOCFLOW_KNOWLEDGE_DB_USER: "docflow"

@@ -146,9 +146,9 @@ def extract_text(
     """Download a Confluence page and extract its text in Markdown format.
 
     The page ID is derived from the page URL. The base URL of the instance is taken from
-    ``base_url`` when provided, which allows Confluence to be served under a context path
-    (e.g. "https://intranet.example.com/confluence"); otherwise it is derived from the
-    page URL (scheme and host).
+    ``base_url`` when provided, which allows Confluence to be served under a context
+    path (e.g. "https://intranet.example.com/confluence"); otherwise it is derived from
+    the page URL (scheme and host).
 
     The storage-format (XHTML) body of the page is downloaded from the Confluence API
     and converted to Markdown.
