@@ -12,6 +12,18 @@ secrets_env_file=/workspace/docflow/.devcontainer/secrets.env
 
 echo "Initializing Airflow environment..."
 
+# When the dev container remaps the "airflow" user's UID/GID to match the host user
+# (updateRemoteUserUID, enabled by default), the AIRFLOW_HOME directory (/opt/airflow)
+# of the base image is left owned by the image's original UID (50000). The remapped
+# airflow user can then no longer write airflow.cfg there, so the first airflow command
+# fails with a permission error. We change the ownership of the AIRFLOW_HOME directory.
+AIRFLOW_HOME="${AIRFLOW_HOME:-/opt/airflow}"
+
+if [ ! -w "$AIRFLOW_HOME" ]; then
+    echo "Fixing ownership of $AIRFLOW_HOME..."
+    sudo chown -R "$(id -u):$(id -g)" "$AIRFLOW_HOME"
+fi
+
 # Install the project in editable mode with its dependencies into Airflow's
 # own Python environment. This serves double duty: Airflow can import from
 # the docflow package at DAG runtime, and VS Code uses the same environment.

@@ -89,7 +89,7 @@ def save_document_batch(
             else:
                 # Create a new document
                 doc = Document(
-                    source_type=DocumentSourceType.confluence,
+                    source_type=DocumentSourceType.confluence_page,
                     title=page.get("title", page_url),
                     source_url=page_url,
                     status=DocumentStatus.pending,

@@ -43,6 +43,12 @@ def ingest_pdf_files():
         mode="reschedule",
         poke_interval=30,
         timeout=3600,
+
+        # On timeout (no PDF files found within the time window), mark the task as
+        # Skipped instead of Failed. The Continuous schedule then immediately starts a
+        # new run, so this avoids noisy failures while idly polling for files.
+        soft_fail=True,
+
         retries=RETRIES,
         retry_delay=RETRY_DELAY,
     )

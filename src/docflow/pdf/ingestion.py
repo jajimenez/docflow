@@ -78,7 +78,7 @@ def save_document_batch(db_url: str, pdf_file_paths: list[str]) -> list[str]:
 
                 # Create a Document instance
                 doc = Document(
-                    source_type=DocumentSourceType.pdf,
+                    source_type=DocumentSourceType.pdf_file,
                     title=title,
                     source_file_path=path,
                     status=DocumentStatus.pending,
