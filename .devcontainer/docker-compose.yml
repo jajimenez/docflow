@@ -70,7 +70,11 @@ services:
 
   # Ollama
   ollama:
-    image: ollama/ollama:0.31.1
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.ollama
+    # Tag the built image so the "ollama-init" service can reuse it without rebuilding
+    image: docflow-ollama:0.31.1
     environment:
       # "host:port"
       OLLAMA_HOST: 0.0.0.0:11434
@@ -88,7 +92,8 @@ services:
 
   # Ollama initializer (must run after the "ollama" service)
   ollama-init:
-    image: ollama/ollama:0.31.1
+    # Reuse the image built by the "ollama" service
+    image: docflow-ollama:0.31.1
     environment:
       OLLAMA_HOST: http://ollama:11434
     depends_on:
