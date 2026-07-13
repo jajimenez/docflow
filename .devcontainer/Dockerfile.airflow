@@ -61,7 +61,7 @@ ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
 # The Hugging Face Xet back-end (hf_xet) does not respect the CA bundle above and hangs
 # indefinitely behind a TLS-inspecting proxy. Force the classic HTTPS download path,
 # which respects the trust store and completes reliably.
-ENV HG_HUB_DISABLE_XET=1
+ENV HF_HUB_DISABLE_XET=1
 
 # Tell Docling where to find Tesseract's language data files
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
