@@ -79,7 +79,7 @@ def save_document_batch(
             else:
                 # Create a new document
                 doc = Document(
-                    source_type=DocumentSourceType.azure_devops,
+                    source_type=DocumentSourceType.azure_devops_wiki_page,
                     title=get_page_title(page),
                     source_url=page_url,
                     status=DocumentStatus.pending,

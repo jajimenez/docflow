@@ -45,9 +45,9 @@ class DocumentStatus(str, Enum):
 class DocumentSourceType(str, Enum):
     """Document source type."""
 
-    pdf = "pdf"
-    azure_devops = "azure_devops"
-    confluence = "confluence"
+    pdf_file = "pdf_file"
+    azure_devops_wiki_page = "azure_devops_wiki_page"
+    confluence_page = "confluence_page"
 
 
 class Document(SQLModel, table=True):
@@ -126,11 +126,11 @@ class Document(SQLModel, table=True):
         # This guarantees source_file_path is never null for PDF documents and
         # source_url is never null for remote sources.
         CheckConstraint(
-            "(source_type = 'pdf' "
+            "(source_type = 'pdf_file' "
             "AND source_file_path IS NOT NULL "
             "AND source_url IS NULL)"
             " OR "
-            "(source_type != 'pdf' "
+            "(source_type != 'pdf_file' "
             "AND source_url IS NOT NULL "
             "AND source_file_path IS NULL)",
             name="check_document_source_fields",
