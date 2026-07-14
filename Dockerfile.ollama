@@ -3,8 +3,7 @@ FROM ollama/ollama:0.31.1
 # Install any corporate/custom CA certificates into the system trust store. On networks
 # with a TLS-inspecting proxy (e.g. corporate environments), the proxy resigns HTTPS
 # with a private root CA. Without trusting it, Ollama cannot pull models and fails.
-# Place PEM-encoded *.crt files into ./devcontainer/certificates (git-ignored) and
-# update the trust store, which is a no-op on networks without such a proxy (empty
-# directory).
-COPY .devcontainer/certificates/ /usr/local/share/ca-certificates/extra/
+# Place PEM-encoded *.crt files into ./certificates (git-ignored) and update the trust
+# store, which is a no-op on networks without such a proxy (empty directory).
+COPY certificates/ /usr/local/share/ca-certificates/extra/
 RUN update-ca-certificates

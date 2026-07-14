@@ -1,0 +1,242 @@
+# Production Docker Compose for Docflow.
+# Copy .env.example to .env and fill in all required values before starting.
+#
+# Secrets setup (run once, save output to .env):
+#   AIRFLOW_SECRET_KEY:  openssl rand -base64 32
+#   AIRFLOW_FERNET_KEY:  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+#
+# Usage:
+#   Start: docker compose up -d
+#   Stop:  docker compose down
+#   Logs:  docker compose logs -f
+
+# Shared configuration for all Airflow services.
+x-airflow-common:
+  &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  environment:
+    &airflow-common-env
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg://airflow:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/airflow"
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__MAX_MAP_LENGTH: "10000"
+    AIRFLOW__API__EXPOSE_CONFIG: "false"
+    AIRFLOW__API__SECRET_KEY: "${AIRFLOW_SECRET_KEY}"
+    AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:Admin"
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/config/passwords.json
+    # Docflow settings — paths are relative to the container, not the host.
+    DOCFLOW_PDF_PENDING_DIR: /opt/airflow/pdf/pending
+    DOCFLOW_PDF_PROCESSED_DIR: /opt/airflow/pdf/processed
+    DOCFLOW_PDF_FAILED_DIR: /opt/airflow/pdf/failed
+    # Models are baked into the image at build time (see Dockerfile.airflow).
+    DOCFLOW_PDF_EXTRACTION_MODELS_PATH: /home/airflow/.cache/docling/models
+    DOCFLOW_MAX_ACTIVE_PROCESSING_TASKS: "4"
+    DOCFLOW_EMBEDDINGS_API_URL: http://ollama:11434/api/embeddings
+    DOCFLOW_KNOWLEDGE_DB_HOST: knowledge-db
+    DOCFLOW_KNOWLEDGE_DB_USER: docflow
+    DOCFLOW_KNOWLEDGE_DB_PASSWORD: "${KNOWLEDGE_DB_PASSWORD}"
+    DOCFLOW_KNOWLEDGE_DB_PORT: "5432"
+    DOCFLOW_KNOWLEDGE_DB_NAME: docflow
+  volumes:
+    # Shared config directory — holds the admin passwords file written by airflow-init.
+    - airflow-config:/opt/airflow/config
+    # PDF pipeline directories — bind-mounted from the host paths set in .env.
+    - ${PDF_PENDING_DIR:?Set PDF_PENDING_DIR in .env}:/opt/airflow/pdf/pending
+    - ${PDF_PROCESSED_DIR:?Set PDF_PROCESSED_DIR in .env}:/opt/airflow/pdf/processed
+    - ${PDF_FAILED_DIR:?Set PDF_FAILED_DIR in .env}:/opt/airflow/pdf/failed
+
+services:
+
+  # ─── Databases ───────────────────────────────────────────────────────────────
+
+  # Airflow metadata database
+  airflow-db:
+    image: postgres:18.4
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: "${AIRFLOW_DB_PASSWORD}"
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow", "-d", "airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Knowledge base (PostgreSQL + pgvector)
+  knowledge-db:
+    build:
+      context: .
+      dockerfile: Dockerfile.knowledge-db
+    environment:
+      POSTGRES_USER: docflow
+      POSTGRES_PASSWORD: "${KNOWLEDGE_DB_PASSWORD}"
+      POSTGRES_DB: docflow
+    volumes:
+      - knowledge-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "docflow", "-d", "docflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ─── Ollama ──────────────────────────────────────────────────────────────────
+
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    # Tag the built image so ollama-init can reuse it without rebuilding.
+    image: docflow-ollama:0.31.1
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    volumes:
+      - ollama-data:/root/.ollama
+    mem_limit: 8g
+    command: ["serve"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "OLLAMA_HOST=http://localhost:11434 ollama list"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Pulls the embedding model on first start; a no-op if the model is already cached.
+  ollama-init:
+    image: docflow-ollama:0.31.1
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama-data:/root/.ollama
+    command: ["pull", "nomic-embed-text:v1.5"]
+    restart: "no"
+
+  # ─── Airflow ─────────────────────────────────────────────────────────────────
+
+  # One-shot initializer that runs on every `docker compose up` (all steps are
+  # idempotent):
+  #   1. Migrates the Airflow metadata database.
+  #   2. Writes the admin password file read by SimpleAuthManager.
+  #   3. Registers the knowledge_db PostgreSQL connection.
+  #   4. Sets the PDF directory variables consumed by the ingestion DAGs.
+  airflow-init:
+    <<: *airflow-common
+    environment:
+      <<: *airflow-common-env
+      AIRFLOW_ADMIN_PASSWORD: "${AIRFLOW_ADMIN_PASSWORD}"
+    command:
+      - bash
+      - -c
+      - |
+        set -e
+        airflow db migrate
+        python -c "
+        import json, os
+        json.dump(
+            {'admin': os.environ['AIRFLOW_ADMIN_PASSWORD']},
+            open('/opt/airflow/config/passwords.json', 'w'),
+        )
+        "
+        airflow connections delete knowledge_db 2>/dev/null || true
+        airflow connections add knowledge_db \
+          --conn-type postgres \
+          --conn-host "$$DOCFLOW_KNOWLEDGE_DB_HOST" \
+          --conn-login "$$DOCFLOW_KNOWLEDGE_DB_USER" \
+          --conn-password "$$DOCFLOW_KNOWLEDGE_DB_PASSWORD" \
+          --conn-port "$${DOCFLOW_KNOWLEDGE_DB_PORT:-5432}" \
+          --conn-schema "$$DOCFLOW_KNOWLEDGE_DB_NAME"
+        airflow variables set docflow_pdf_pending_dir "$$DOCFLOW_PDF_PENDING_DIR"
+        airflow variables set docflow_pdf_processed_dir "$$DOCFLOW_PDF_PROCESSED_DIR"
+        airflow variables set docflow_pdf_failed_dir "$$DOCFLOW_PDF_FAILED_DIR"
+    restart: "no"
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      knowledge-db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+
+  # Evaluates DAG run triggers and queues task instances
+  airflow-scheduler:
+    <<: *airflow-common
+    command: ["airflow", "scheduler"]
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Parses DAG files and keeps the metadata database in sync
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: ["airflow", "dag-processor"]
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Serves the web UI and REST API on port 8080
+  airflow-api-server:
+    <<: *airflow-common
+    command: ["airflow", "api-server"]
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ─── MCP server ──────────────────────────────────────────────────────────────
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    environment:
+      DOCFLOW_MCP_API_KEY: "${DOCFLOW_MCP_API_KEY}"
+      DOCFLOW_EMBEDDINGS_API_URL: http://ollama:11434/api/embeddings
+      DOCFLOW_KNOWLEDGE_DB_HOST: knowledge-db
+      DOCFLOW_KNOWLEDGE_DB_USER: docflow
+      DOCFLOW_KNOWLEDGE_DB_PASSWORD: "${KNOWLEDGE_DB_PASSWORD}"
+      DOCFLOW_KNOWLEDGE_DB_PORT: "5432"
+      DOCFLOW_KNOWLEDGE_DB_NAME: docflow
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+      knowledge-db:
+        condition: service_healthy
+
+  # ─── Database admin UI ───────────────────────────────────────────────────────
+
+  adminer:
+    image: adminer:5.4.2
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      knowledge-db:
+        condition: service_healthy
+
+volumes:
+  airflow-db-data:
+  airflow-config:
+  knowledge-db-data:
+  ollama-data:
