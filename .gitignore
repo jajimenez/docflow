@@ -218,8 +218,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Corporate/custom CA certificates for TLS-inspecting proxies
-.devcontainer/certificates/*.crt
-.devcontainer/certificates/*.pem
+certificates/*.crt
+certificates/*.pem
 
 # Dev container secrets (auto-generated, must never be committed)
 .devcontainer/secrets.env
