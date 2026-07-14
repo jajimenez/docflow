@@ -5,8 +5,8 @@ USER root
 
 # Install system dependencies:
 # - sudo and ca-certificates (dev container essentials)
-# - git and build tools (source control and compiling C extensions)
-# - libpq-dev and python3-dev (required to compile psycopg from source)
+# - git (source control)
+# - libpq5 (required by psycopg3's pure-Python client at runtime, loaded via ctypes)
 # - libgl1 and libglib2.0-0 (required by Docling via OpenCV)
 # - tesseract-ocr-all (OCR engine used by Docling, with all language packs)
 # - socat (proxies localhost:8081 -> adminer:8080 so VS Code can forward the port)
@@ -15,9 +15,7 @@ RUN apt-get update && \
         sudo \
         ca-certificates \
         git \
-        build-essential \
-        libpq-dev \
-        python3-dev \
+        libpq5 \
         libgl1 \
         libglib2.0-0 \
         tesseract-ocr-all \

@@ -1,0 +1,32 @@
+# MCP server for querying the Docflow Knowledge Database via Streamable HTTP
+
+FROM python:3.14-slim
+
+# libpq5: required by psycopg3's pure-Python client at runtime (loaded via ctypes)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq5 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Run as a non-root user (security best practice)
+RUN useradd --create-home --shell /bin/bash mcp
+USER mcp
+WORKDIR /home/mcp/app
+
+# Create an isolated virtual environment so "pip install" works without "--user"
+ENV VIRTUAL_ENV=/home/mcp/venv
+RUN python -m venv "$VIRTUAL_ENV"
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Copy the package files
+# Copying "src" together with "pyproject.toml" is required because Hatchling discovers
+# packages from "src" at install time.
+COPY --chown=mcp:mcp pyproject.toml README.md ./
+COPY --chown=mcp:mcp src/ ./src/
+
+# Install the package with the "mcp" extra, which includes all required dependencies
+RUN pip install --no-cache-dir ".[mcp]"
+
+EXPOSE 8000
+
+CMD ["docflow-mcp"]
