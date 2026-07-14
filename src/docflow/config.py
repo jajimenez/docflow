@@ -2,18 +2,18 @@
 
 from functools import lru_cache
 
-from pydantic import computed_field
+from pydantic import SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Docflow settings."""
 
-    # PDF files
-    pdf_pending_dir: str
-    pdf_processed_dir: str
-    pdf_failed_dir: str
-    pdf_extraction_models_path: str  # Docling text extraction models
+    # PDF files (only required when running PDF ingestion; None is safe for other services)
+    pdf_pending_dir: str | None = None
+    pdf_processed_dir: str | None = None
+    pdf_failed_dir: str | None = None
+    pdf_extraction_models_path: str | None = None  # Docling text extraction models
 
     # Document chunks
     chunk_size: int = 1000
@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     embeddings_api_timeout: int = 30  # API requests timeout in seconds
     embeddings_model: str = "nomic-embed-text:v1.5"
     embeddings_dimension: int = 768
+
+    # MCP server (only required when running the MCP server; None is safe for other services)
+    mcp_api_key: SecretStr | None = None
+    mcp_port: int = 8000
 
     # Knowledge database
     knowledge_db_host: str

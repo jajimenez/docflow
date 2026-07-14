@@ -36,6 +36,7 @@ services:
       - "8080:8080"
     volumes:
       - ..:/workspace/docflow
+      - airflow-pip-cache:/home/airflow/.cache/pip
 
     # Prevent the container from exiting immediately
     command: "sleep infinity"
@@ -135,7 +136,41 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # MCP server (development mode: editable install from the mounted workspace)
+  # In production, use Dockerfile.mcp instead.
+  mcp:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.airflow
+    environment:
+      # A hardcoded dev key — change this when deploying outside localhost.
+      DOCFLOW_MCP_API_KEY: "docflow"
+      DOCFLOW_EMBEDDINGS_API_URL: "http://ollama:11434/api/embeddings"
+      DOCFLOW_KNOWLEDGE_DB_HOST: "knowledge-db"
+      DOCFLOW_KNOWLEDGE_DB_USER: "docflow"
+      DOCFLOW_KNOWLEDGE_DB_PASSWORD: "docflow"
+      DOCFLOW_KNOWLEDGE_DB_PORT: "5432"
+      DOCFLOW_KNOWLEDGE_DB_NAME: "docflow"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ..:/workspace/docflow
+      # Cache downloaded packages so repeated container recreations are fast.
+      - mcp-pip-cache:/home/airflow/.cache/pip
+    command:
+      - bash
+      - -c
+      - "pip install -q -e '/workspace/docflow[mcp]' && docflow-mcp"
+    depends_on:
+      ollama:
+        condition: service_healthy
+      knowledge-db:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
+  airflow-pip-cache:
   airflow-db-data:
   ollama-data:
   knowledge-db-data:
+  mcp-pip-cache:

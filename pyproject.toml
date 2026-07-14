@@ -23,6 +23,13 @@ dev = [
     "black>=26.5.1,<26.6.0",
     "debugpy>=1.8.21,<1.9.0"
 ]
+mcp = [
+    "mcp>=1.28.1,<1.29.0",
+    "uvicorn>=0.51.0,<0.52.0"
+]
+
+[project.scripts]
+docflow-mcp = "docflow.mcp.server:main"
 
 [build-system]
 requires = ["hatchling"]

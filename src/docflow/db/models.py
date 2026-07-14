@@ -111,6 +111,7 @@ class Document(SQLModel, table=True):
             DateTime(timezone=True),
             nullable=False,
             server_default=func.now(),
+            onupdate=func.now(),
         )
     )
 

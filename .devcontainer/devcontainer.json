@@ -6,7 +6,7 @@
     "remoteUser": "airflow",
     "initializeCommand": "[ -f .devcontainer/docker-compose.local.yml ] || cp .devcontainer/docker-compose.local.example.yml .devcontainer/docker-compose.local.yml",
     "postCreateCommand": ["bash", ".devcontainer/airflow-init.sh"],
-    "forwardPorts": [8080, 8081],
+    "forwardPorts": [8080, 8081, 8000],
     "shutdownAction": "stopCompose",
     "customizations": {
         "vscode": {
