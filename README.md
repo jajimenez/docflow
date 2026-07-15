@@ -304,7 +304,7 @@ picks them up automatically.
 
 | Field | Value |
 |---|---|
-| Connection ID | any name, e.g. `azure_devops_org` |
+| Connection ID | any name, e.g. `azure_devops_connection` |
 | Connection Type | `Generic` |
 | Host | `dev.azure.com/org` (or the full URL) |
 | Schema | `https` |
@@ -312,7 +312,7 @@ picks them up automatically.
 
 Via CLI:
 ```bash
-airflow connections add azure_devops_org \
+airflow connections add azure_devops_connection \
   --conn-type generic \
   --conn-host "dev.azure.com/org" \
   --conn-schema https \
@@ -323,15 +323,14 @@ airflow connections add azure_devops_org \
 
 ```json
 [
-  {"conn_id": "azure_devops_org_1", "project": "project-1", "wiki": "project-1.wiki"},
-  {"conn_id": "azure_devops_org_2", "project": "project-2", "wiki": "project-2.wiki"}
+  {"conn_id": "azure_devops_connection", "project": "project_example", "wiki": "project_example.wiki"}
 ]
 ```
 
 Via CLI:
 ```bash
 airflow variables set docflow_azure_devops_targets \
-  '[{"conn_id": "azure_devops_myorg", "project": "project-1", "wiki": "project-1.wiki"}]'
+  '[{"conn_id": "azure_devops_connection", "project": "project_example", "wiki": "project_example.wiki"}]'
 ```
 
 ---
@@ -342,7 +341,7 @@ airflow variables set docflow_azure_devops_targets \
 
 | Field | Value |
 |---|---|
-| Connection ID | any name, e.g. `confluence_host` |
+| Connection ID | any name, e.g. `confluence_connection` |
 | Connection Type | `Generic` |
 | Host | hostname, e.g. `confluence.example.com` |
 | Schema | `https` |
@@ -352,7 +351,7 @@ airflow variables set docflow_azure_devops_targets \
 
 Via CLI (username/password):
 ```bash
-airflow connections add confluence_host \
+airflow connections add confluence_connection \
   --conn-type generic \
   --conn-host "confluence.example.com" \
   --conn-schema https \
@@ -362,7 +361,7 @@ airflow connections add confluence_host \
 
 For Confluence Cloud with a personal access token only:
 ```bash
-airflow connections add confluence_cloud \
+airflow connections add confluence_cloud_connection \
   --conn-type generic \
   --conn-host "org.atlassian.net" \
   --conn-schema https \
@@ -373,24 +372,22 @@ airflow connections add confluence_cloud \
 
 ```json
 [
-  {"conn_id": "confluence_host_1", "space_key": "a"},
-  {"conn_id": "confluence_host_2", "space_key": "b"},
-  {"conn_id": "confluence_host_3", "space_key": "c"}
+  {"conn_id": "confluence_connection", "space_key": "space_key_example"}
 ]
 ```
 
 Via CLI:
 ```bash
 airflow variables set docflow_confluence_targets \
-  '[{"conn_id": "confluence_host", "space_key": "a"}]'
+  '[{"conn_id": "confluence_connection", "space_key": "space_key_example"}]'
 ```
 
 ---
 
 ### MCP server
 
-The MCP server exposes the knowledge base to AI assistants via the Model Context Protocol
-over Streamable HTTP. It requires a Bearer token for all requests (`DOCFLOW_MCP_API_KEY`).
+The MCP (Model Context Protocol) server exposes the knowledge base to AI agents via the
+MCP over Streamable HTTP. It requires a Bearer token for all requests (`DOCFLOW_MCP_API_KEY`).
 
 **Endpoint:** `http://localhost:8000/mcp`
 
@@ -401,21 +398,3 @@ over Streamable HTTP. It requires a Bearer token for all requests (`DOCFLOW_MCP_
 | `search_documents` | Semantic similarity search over all document chunks. Primary tool for answering questions. |
 | `list_documents` | Lists all successfully ingested documents. Useful for discovering what sources are available. |
 | `get_document_chunks` | Returns the full ordered text of a specific document by ID. |
-
-**Configuring VS Code Copilot** — add to your VS Code `settings.json`:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "docflow": {
-        "type": "http",
-        "url": "http://localhost:8000/mcp",
-        "headers": {
-          "Authorization": "Bearer api-key"
-        }
-      }
-    }
-  }
-}
-```
