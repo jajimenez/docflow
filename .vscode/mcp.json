@@ -1,19 +1,19 @@
 {
-	"servers": {
-		"docflow-mcp-server": {
-			"url": "http://localhost:8000/mcp",
-			"type": "http",
-			"headers": {
-				"Authorization": "Bearer ${input:docflowApiKey}"
-			}
-		}
-	},
-	"inputs": [
-		{
-			"id": "docflowApiKey",
-			"type": "promptString",
-			"description": "Docflow MCP API key",
-			"password": true
-		}
-	]
+    "servers": {
+        "docflow": {
+            "type": "http",
+            "url": "http://localhost:8000/mcp",
+            "headers": {
+            "Authorization": "Bearer ${input:docflowApiKey}"
+            }
+        }
+    },
+    "inputs": [
+        {
+            "id": "docflowApiKey",
+            "type": "promptString",
+            "description": "Docflow MCP API key",
+            "password": true
+        }
+    ]
 }
