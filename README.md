@@ -1,9 +1,9 @@
 # Docflow
 
-Docflow ingests documentation from multiple sources — Azure DevOps wikis, Confluence
-spaces, and PDF files — into a PostgreSQL vector database and exposes the knowledge base
-through an MCP (Model Context Protocol) server so AI agents can answer questions about
-the documentation.
+Docflow is a documentation ingestion and knowledge retrieval system. It ingests content
+from multiple sources — Azure DevOps wikis, Confluence spaces, and PDF files — into a
+PostgreSQL vector database and exposes the knowledge base through an MCP (Model Context
+Protocol) server so AI agents can answer questions about the documentation.
 
 ## Table of contents
 

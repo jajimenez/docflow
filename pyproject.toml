@@ -1,7 +1,7 @@
 [project]
 name = "docflow"
 version = "0.1.0"
-description = "Airflow DAGs and MCP server for ingesting documentation from multiple sources"
+description = "Documentation ingestion pipelines and MCP knowledge base server for AI agents"
 readme = "README.md"
 authors = [{ name = "Jose A. Jimenez", email = "jajimenezcarm@gmail.com" }]
 requires-python = ">=3.14"
