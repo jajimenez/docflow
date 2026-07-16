@@ -21,5 +21,5 @@ All notable changes to this project will be documented in this file.
 - Dev container configuration for local development with VS Code.
 - Production Docker Compose stack with `airflow-init` service for automated first-run setup.
 
-[Unreleased]: https://github.com/jajimenezcarm/docflow/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/jajimenezcarm/docflow/releases/tag/v0.1.0
+[Unreleased]: https://github.com/jajimenez/docflow/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/jajimenez/docflow/releases/tag/v0.1.0
