@@ -226,7 +226,7 @@ certificates/*.pem
 .devcontainer/docker-compose.local.yml
 .devcontainer/airflow-passwords.json
 
-# PDF pipeline directories - ignore PDFs but keep directory structure
-pdf/pending/*.pdf
-pdf/processed/*.pdf
-pdf/failed/*.pdf
+# Dev container - PDF pipeline directories - ignore PDFs but keep directory structure
+.devcontainer/pdf/pending/*.pdf
+.devcontainer/pdf/processed/*.pdf
+.devcontainer/pdf/failed/*.pdf
