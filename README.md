@@ -68,15 +68,32 @@ graph TD
 |---|---|
 | **Apache Airflow 3** | Orchestrates ingestion pipelines with the DAG Processor, Scheduler and API Server running as separate processes |
 | **PostgreSQL + pgvector** | Stores documents and their vector embeddings in the knowledge database |
-| **Ollama (model `nomic-embed-text:v1.5`)** | Generates 768-dimensional text embeddings locally, with no external API dependency |
 | **Docling** | Extracts text from PDF files using layout analysis (with Tesseract OCR as a back-end) |
-| **atlassian-python-api** | Fetches pages from Confluence Cloud and Server/Data Center instances |
 | **azure-devops** | Fetches pages from Azure DevOps wiki repositories |
+| **atlassian-python-api** | Fetches pages from Confluence Cloud and Server/Data Center instances |
 | **markdownify** | Converts Confluence HTML page content to Markdown before chunking |
 | **LangChain Text Splitters** | Splits document text into overlapping chunks for embedding |
+| **Ollama (model `nomic-embed-text:v1.5`)** | Generates 768-dimensional text embeddings locally, with no external API dependency |
 | **MCP server (FastMCP)** | Exposes the knowledge base to AI agents via the Model Context Protocol over Streamable HTTP |
 
 ### DAGs
+
+#### `ingest_pdf_files`
+
+Runs on a **continuous** schedule, polling every 30 seconds. Ingests every PDF file in
+`pending` directory.
+
+```
+set_up_database
+    └── wait_for_pdf_files   (sensor — reschedule mode, 30 s interval)
+            └── save_documents
+                    └── process_document   (mapped — one task per file)
+```
+
+Each `process_document` task uses Docling to extract the text of the PDF file (in
+Markdown format), splits it into chunks, generates embeddings, writes them to the
+knowledge database, and moves the file to the `processed` or `failed` directory
+depending on the outcome.
 
 #### `ingest_azure_devops_wikis`
 
@@ -110,23 +127,6 @@ set_up_database
 Each `process_document` task fetches the Confluence page HTML, converts it to Markdown
 with markdownify, splits it into chunks, generates embeddings, and writes them to the
 knowledge database.
-
-#### `ingest_pdf_files`
-
-Runs on a **continuous** schedule, polling every 30 seconds. Ingests every PDF file in
-`pending` directory.
-
-```
-set_up_database
-    └── wait_for_pdf_files   (sensor — reschedule mode, 30 s interval)
-            └── save_documents
-                    └── process_document   (mapped — one task per file)
-```
-
-Each `process_document` task uses Docling to extract the text of the PDF file (in
-Markdown format), splits it into chunks, generates embeddings, writes them to the
-knowledge database, and moves the file to the `processed` or `failed` directory
-depending on the outcome.
 
 ---
 
@@ -276,7 +276,7 @@ Create one Airflow connection per Azure DevOps organization:
 | Schema | `https` |
 | Password | Personal Access Token (PAT), or leave empty for public projects |
 
-Via the CLI:
+Via the CLI, inside any of the Airflow containers:
 
 ```bash
 airflow connections add azure_devops_organization \
@@ -295,7 +295,7 @@ containing each Azure DevOps connections among its project and wiki.
 ]
 ```
 
-Via the CLI:
+Via the CLI, inside any of the Airflow containers:
 
 ```bash
 airflow variables set azure_devops_targets \
@@ -316,7 +316,7 @@ Create one Airflow connection per Confluence host:
 | Password | password or API token (leave empty for anonymous) |
 | Extra (JSON) | `{"token": "...", "verify_ssl": true, "cloud": false}` (all optional) |
 
-Via the CLI:
+Via the CLI, inside any of the Airflow containers:
 
 ```bash
 airflow connections add confluence_host \
@@ -346,7 +346,7 @@ containing each Confluence connections among its space.
 ]
 ```
 
-Via the CLI:
+Via the CLI, inside any of the Airflow containers:
 
 ```bash
 airflow variables set confluence_targets \
