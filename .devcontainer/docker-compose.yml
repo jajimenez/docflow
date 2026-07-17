@@ -21,9 +21,9 @@ services:
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:Admin"
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/workspace/docflow/.devcontainer/airflow-passwords.json"
       # Docflow settings
-      DOCFLOW_PDF_PENDING_DIR: "/workspace/docflow/pdf/pending"
-      DOCFLOW_PDF_PROCESSED_DIR: "/workspace/docflow/pdf/processed"
-      DOCFLOW_PDF_FAILED_DIR: "/workspace/docflow/pdf/failed"
+      DOCFLOW_PDF_PENDING_DIR: "/workspace/docflow/.devcontainer/pdf/pending"
+      DOCFLOW_PDF_PROCESSED_DIR: "/workspace/docflow/.devcontainer/pdf/processed"
+      DOCFLOW_PDF_FAILED_DIR: "/workspace/docflow/.devcontainer/pdf/failed"
       DOCFLOW_PDF_EXTRACTION_MODELS_PATH: "/home/airflow/.cache/docling/models"
       DOCFLOW_MAX_ACTIVE_PROCESSING_TASKS: "4"
       DOCFLOW_EMBEDDINGS_API_URL: "http://ollama:11434/api/embeddings"

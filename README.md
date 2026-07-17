@@ -222,29 +222,10 @@ colima start --cpu 4 --memory 8
 
 ### Configuration
 
-Copy `.env.example` to `.env` and fill in all required values:
+Copy `.env.example` to `.env` and fill in all required values.
 
 ```bash
 cp .env.example .env
-```
-
-Generate the two stable cryptographic secrets and paste them into `.env`:
-
-```bash
-# AIRFLOW_SECRET_KEY — signs JWT tokens for API/UI sessions
-openssl rand -base64 32
-
-# AIRFLOW_FERNET_KEY — encrypts connection passwords and variables in the metadata DB
-# Keep this value forever; changing it makes all encrypted data permanently unreadable.
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-Set the host paths for the PDF pipeline directories in `.env`:
-
-```
-PDF_PENDING_DIR=/path/to/your/pdf/pending
-PDF_PROCESSED_DIR=/path/to/your/pdf/processed
-PDF_FAILED_DIR=/path/to/your/pdf/failed
 ```
 
 ### Starting the stack
@@ -391,7 +372,7 @@ MCP over Streamable HTTP. It requires a Bearer token for all requests (`DOCFLOW_
 
 **Endpoint:** `http://localhost:8000/mcp`
 
-**Tools available to the AI assistant:**
+**Tools available to AI agents:**
 
 | Tool | Description |
 |---|---|
