@@ -1,7 +1,7 @@
 # Docflow
 
 Docflow is a documentation ingestion and knowledge retrieval system. It ingests content
-from multiple sources — Azure DevOps wikis, Confluence spaces, and PDF files — into a
+from multiple sources — PDF files, Azure DevOps wikis, and Confluence spaces — into a
 PostgreSQL vector database and exposes the knowledge base through an MCP (Model Context
 Protocol) server so AI agents can answer questions about the documentation.
 
@@ -74,14 +74,14 @@ graph TD
 | **azure-devops** | Fetches pages from Azure DevOps wiki repositories |
 | **markdownify** | Converts Confluence HTML page content to Markdown before chunking |
 | **LangChain Text Splitters** | Splits document text into overlapping chunks for embedding |
-| **MCP server (FastMCP)** | Exposes the knowledge base to AI assistants via the Model Context Protocol over Streamable HTTP |
+| **MCP server (FastMCP)** | Exposes the knowledge base to AI agents via the Model Context Protocol over Streamable HTTP |
 
 ### DAGs
 
 #### `ingest_azure_devops_wikis`
 
 Runs on a **daily** schedule. Ingests every Azure DevOps wiki listed in the
-`docflow_azure_devops_targets` Airflow variable.
+`azure_devops_targets` Airflow variable.
 
 ```
 set_up_database
@@ -91,13 +91,13 @@ set_up_database
                             └── process_document   (mapped — one task per page)
 ```
 
-Each `process_document` task fetches the wiki page text, splits it into chunks,
-generates embeddings, and writes them to the knowledge database.
+Each `process_document` task fetches the wiki page text (in Markdown format), splits it
+into chunks, generates embeddings, and writes them to the knowledge database.
 
 #### `ingest_confluence_spaces`
 
 Runs on a **daily** schedule. Ingests every Confluence space listed in the
-`docflow_confluence_targets` Airflow variable.
+`confluence_targets` Airflow variable.
 
 ```
 set_up_database
@@ -113,7 +113,8 @@ knowledge database.
 
 #### `ingest_pdf_files`
 
-Runs on a **continuous** schedule, polling every 30 seconds.
+Runs on a **continuous** schedule, polling every 30 seconds. Ingests every PDF file in
+`pending` directory.
 
 ```
 set_up_database
@@ -122,9 +123,10 @@ set_up_database
                     └── process_document   (mapped — one task per file)
 ```
 
-Each `process_document` task uses Docling to extract text from the PDF, splits it into
-chunks, generates embeddings, and moves the file to the `processed/` or `failed/`
-directory depending on the outcome.
+Each `process_document` task uses Docling to extract the text of the PDF file (in
+Markdown format), splits it into chunks, generates embeddings, writes them to the
+knowledge database, and moves the file to the `processed` or `failed` directory
+depending on the outcome.
 
 ---
 
@@ -149,12 +151,13 @@ colima start --cpu 4 --memory 8
 
 VS Code builds the Docker images and runs `postCreateCommand`
 (`.devcontainer/airflow-init.sh`), which:
+
 - Installs the `docflow` package in editable mode.
 - Generates `AIRFLOW__API__SECRET_KEY` and `AIRFLOW__CORE__FERNET_KEY` into
   `.devcontainer/secrets.env` if they do not already exist.
 - Runs `airflow db migrate`.
 - Creates the `knowledge_db` Airflow connection.
-- Sets the PDF directory Airflow variables.
+- Sets the Airflow variables for the `pending`, `processed`, and `failed` directories.
 
 ### Local overrides (`docker-compose.local.yml`)
 
@@ -162,8 +165,8 @@ VS Code builds the Docker images and runs `postCreateCommand`
 lets you override settings for your machine without touching version-controlled files.
 A template is provided at `.devcontainer/docker-compose.local.example.yml`.
 
-Common use case — Colima / remote SSH users who need `socat` to proxy the Adminer port
-so VS Code port forwarding works:
+Common use case: Colima users who need `socat` to proxy the Adminer and MCP ports so VS
+Code port forwarding works:
 
 ```yaml
 services:
@@ -173,8 +176,8 @@ services:
 
 ### Running Airflow
 
-Inside the dev container, Airflow components must be started manually in separate VS Code
-terminals:
+Inside the dev container, Airflow components must be started manually in separate VS
+Code terminals:
 
 **Terminal 1 — DAG Processor:**
 ```bash
@@ -191,8 +194,8 @@ airflow scheduler
 airflow api-server
 ```
 
-The web UI is available at `http://localhost:8080`. The default credentials are `admin` /
-`admin`.
+The web UI is available at `http://localhost:8080`. The default credentials are `admin`
+/ `admin`.
 
 ### Running tests
 
@@ -220,7 +223,7 @@ If you are using Colima to run Docker, start it with the recommended resources:
 colima start --cpu 4 --memory 8
 ```
 
-### Configuration
+### Configuration (environment variables)
 
 Copy `.env.example` to `.env` and fill in all required values.
 
@@ -235,94 +238,77 @@ docker compose up -d
 ```
 
 On first start, the `airflow-init` service runs automatically. It migrates the Airflow
-metadata database, writes the admin password file, registers the `knowledge_db` connection,
-and sets the PDF directory variables. All steps are idempotent and run on every
-`docker compose up`.
+metadata database, writes the admin password file, registers the `knowledge_db`
+Airflow connection, and sets the Airflow variables for the `pending`, `processed` and
+`failed` directories.
 
 | Service | URL |
 |---|---|
 | Airflow web UI | `http://localhost:8080` |
 | MCP server | `http://localhost:8000/mcp` |
-| Adminer (DB admin) | `http://localhost:8081` |
+| Adminer (DB administration) | `http://localhost:8081` |
 
 ### Stopping the stack
 
 ```bash
-docker compose down          # keeps volumes (data is preserved)
-docker compose down -v       # also deletes volumes (data is lost)
+docker compose down     # Keeps volumes (data is preserved)
+docker compose down -v  # Also deletes volumes (data is lost)
 ```
 
 ---
 
-## Usage
+## Configuration (Airflow connections and variables)
 
-### Airflow connections and variables
+Once the system is running, either in developmemt or production, some Airflow
+connections and variables must be created manually for the `ingest_azure_devops_wikis`
+and `ingest_confluence_spaces` DAGs. You can create them via the Airflow web UI or the
+Airflow CLI.
 
-The required connections and variables are created automatically in the **dev container**
-(by `airflow-init.sh`) and in **production** (by the `airflow-init` service). The instructions
-below are for adding ingestion targets after the stack is running, via the Airflow web UI or CLI.
+### `ingest_azure_devops_wikis`
 
----
-
-#### `ingest_pdf_files`
-
-No connections required. Drop PDF files into the configured pending directory; the DAG
-picks them up automatically.
-
-**Variables**
-
-| Variable | Description | Set by init |
-|---|---|---|
-| `docflow_pdf_pending_dir` | Absolute path to the PDF pending directory (inside the container) | ✓ |
-| `docflow_pdf_processed_dir` | Absolute path to the PDF processed directory (inside the container) | ✓ |
-| `docflow_pdf_failed_dir` | Absolute path to the PDF failed directory (inside the container) | ✓ |
-
----
-
-#### `ingest_azure_devops_wikis`
-
-**Connection** — create one connection per Azure DevOps organization:
+Create one Airflow connection per Azure DevOps organization:
 
 | Field | Value |
 |---|---|
-| Connection ID | any name, e.g. `azure_devops_connection` |
+| Connection ID | any name, e.g. `azure_devops_organization` |
 | Connection Type | `Generic` |
-| Host | `dev.azure.com/org` (or the full URL) |
+| Host | `dev.azure.com/organization` (or the full URL) |
 | Schema | `https` |
 | Password | Personal Access Token (PAT), or leave empty for public projects |
 
-Via CLI:
+Via the CLI:
+
 ```bash
-airflow connections add azure_devops_connection \
+airflow connections add azure_devops_organization \
   --conn-type generic \
-  --conn-host "dev.azure.com/org" \
+  --conn-host "dev.azure.com/organization" \
   --conn-schema https \
   --conn-password "pat"
 ```
 
-**Variable** — `docflow_azure_devops_targets` (JSON array):
+Create an Airflow variable named `azure_devops_targets`. Its value must be a JSON array
+containing each Azure DevOps connections among its project and wiki.
 
 ```json
 [
-  {"conn_id": "azure_devops_connection", "project": "project_example", "wiki": "project_example.wiki"}
+  {"conn_id": "azure_devops_organization", "project": "project_example", "wiki": "project_example.wiki"}
 ]
 ```
 
-Via CLI:
+Via the CLI:
+
 ```bash
-airflow variables set docflow_azure_devops_targets \
-  '[{"conn_id": "azure_devops_connection", "project": "project_example", "wiki": "project_example.wiki"}]'
+airflow variables set azure_devops_targets \
+  '[{"conn_id": "azure_devops_organization", "project": "project_example", "wiki": "project_example.wiki"}]'
 ```
 
----
+### `ingest_confluence_spaces`
 
-#### `ingest_confluence_spaces`
-
-**Connection** — create one connection per Confluence host/credential set:
+Create one Airflow connection per Confluence host:
 
 | Field | Value |
 |---|---|
-| Connection ID | any name, e.g. `confluence_connection` |
+| Connection ID | any name, e.g. `confluence_host` |
 | Connection Type | `Generic` |
 | Host | hostname, e.g. `confluence.example.com` |
 | Schema | `https` |
@@ -330,9 +316,10 @@ airflow variables set docflow_azure_devops_targets \
 | Password | password or API token (leave empty for anonymous) |
 | Extra (JSON) | `{"token": "...", "verify_ssl": true, "cloud": false}` (all optional) |
 
-Via CLI (username/password):
+Via the CLI:
+
 ```bash
-airflow connections add confluence_connection \
+airflow connections add confluence_host \
   --conn-type generic \
   --conn-host "confluence.example.com" \
   --conn-schema https \
@@ -341,26 +328,29 @@ airflow connections add confluence_connection \
 ```
 
 For Confluence Cloud with a personal access token only:
+
 ```bash
-airflow connections add confluence_cloud_connection \
+airflow connections add confluence_cloud_host \
   --conn-type generic \
   --conn-host "org.atlassian.net" \
   --conn-schema https \
   --conn-extra '{"token":"pat", "cloud":true}'
 ```
 
-**Variable** — `docflow_confluence_targets` (JSON array):
+Create an Airflow variable named `confluence_targets`. Its value must be a JSON array
+containing each Confluence connections among its space.
 
 ```json
 [
-  {"conn_id": "confluence_connection", "space_key": "space_key_example"}
+  {"conn_id": "confluence_host", "space_key": "space_key_example"}
 ]
 ```
 
-Via CLI:
+Via the CLI:
+
 ```bash
-airflow variables set docflow_confluence_targets \
-  '[{"conn_id": "confluence_connection", "space_key": "space_key_example"}]'
+airflow variables set confluence_targets \
+  '[{"conn_id": "confluence_host", "space_key": "space_key_example"}]'
 ```
 
 ---
@@ -368,7 +358,8 @@ airflow variables set docflow_confluence_targets \
 ### MCP server
 
 The MCP (Model Context Protocol) server exposes the knowledge base to AI agents via the
-MCP over Streamable HTTP. It requires a Bearer token for all requests (`DOCFLOW_MCP_API_KEY`).
+MCP over Streamable HTTP. It requires a Bearer token for all requests
+(`DOCFLOW_MCP_API_KEY`).
 
 **Endpoint:** `http://localhost:8000/mcp`
 
