@@ -180,9 +180,9 @@ services:
           --conn-password "$$DOCFLOW_KNOWLEDGE_DB_PASSWORD" \
           --conn-port "$${DOCFLOW_KNOWLEDGE_DB_PORT:-5432}" \
           --conn-schema "$$DOCFLOW_KNOWLEDGE_DB_NAME"
-        airflow variables set docflow_pdf_pending_dir "$$DOCFLOW_PDF_PENDING_DIR"
-        airflow variables set docflow_pdf_processed_dir "$$DOCFLOW_PDF_PROCESSED_DIR"
-        airflow variables set docflow_pdf_failed_dir "$$DOCFLOW_PDF_FAILED_DIR"
+        airflow variables set pdf_pending_dir "$$DOCFLOW_PDF_PENDING_DIR"
+        airflow variables set pdf_processed_dir "$$DOCFLOW_PDF_PROCESSED_DIR"
+        airflow variables set pdf_failed_dir "$$DOCFLOW_PDF_FAILED_DIR"
     restart: "no"
     depends_on:
       airflow-db:

@@ -86,9 +86,9 @@ airflow connections add knowledge_db \
 
 # Create Airflow variables
 echo "Creating Airflow variables..."
-airflow variables set docflow_pdf_pending_dir "$DOCFLOW_PDF_PENDING_DIR"
-airflow variables set docflow_pdf_processed_dir "$DOCFLOW_PDF_PROCESSED_DIR"
-airflow variables set docflow_pdf_failed_dir "$DOCFLOW_PDF_FAILED_DIR"
+airflow variables set pdf_pending_dir "$DOCFLOW_PDF_PENDING_DIR"
+airflow variables set pdf_processed_dir "$DOCFLOW_PDF_PROCESSED_DIR"
+airflow variables set pdf_failed_dir "$DOCFLOW_PDF_FAILED_DIR"
 
 # Seed the SimpleAuthManager password file with a known development password.
 # Airflow 3 uses SimpleAuthManager by default; it stores passwords in

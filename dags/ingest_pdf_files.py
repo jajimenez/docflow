@@ -60,7 +60,7 @@ def ingest_pdf_files():
         """
         from docflow.pdf.ingestion import get_pending_pdf_file_paths
 
-        pending_dir = Variable.get("docflow_pdf_pending_dir")
+        pending_dir = Variable.get("pdf_pending_dir")
         paths = get_pending_pdf_file_paths(pending_dir)
 
         return PokeReturnValue(is_done=len(paths) > 0, xcom_value=paths)
@@ -103,8 +103,8 @@ def ingest_pdf_files():
         from airflow.sdk import get_current_context
         from docflow.pdf import ingestion
 
-        processed_dir = Variable.get("docflow_pdf_processed_dir")
-        failed_dir = Variable.get("docflow_pdf_failed_dir")
+        processed_dir = Variable.get("pdf_processed_dir")
+        failed_dir = Variable.get("pdf_failed_dir")
 
         # Only move the file to the Failed directory once all tries have been made, so
         # that intermediate tries can still find it in the Pending directory.
