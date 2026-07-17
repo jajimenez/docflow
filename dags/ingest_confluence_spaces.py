@@ -13,7 +13,7 @@ RETRIES = 3
 RETRY_DELAY = timedelta(minutes=5)
 
 # Name of the Airflow variable holding the list of Confluence targets (JSON)
-CONFLUENCE_TARGETS_VAR = "docflow_confluence_targets"
+CONFLUENCE_TARGETS_VAR = "confluence_targets"
 
 
 def _get_confluence_options(conn_id: str) -> dict:
@@ -77,16 +77,16 @@ def _get_confluence_options(conn_id: str) -> dict:
 def ingest_confluence_spaces():
     """DAG to ingest the pages of one or more Confluence spaces.
 
-    This DAG ingests every Confluence target configured in the
-    "docflow_confluence_targets" Airflow variable, which is a JSON list of objects, each
-    with a "conn_id" (the Airflow connection for a Confluence host and its optional
-    credentials) and a "space_key". This allows ingesting multiple spaces from multiple
-    hosts, each with its own credentials. For example:
+    This DAG ingests every Confluence target configured in the "confluence_targets"
+    Airflow variable, which is a JSON list of objects, each with a "conn_id" (the
+    Airflow connection for a Confluence host and its optional credentials) and a
+    "space_key". This allows ingesting multiple spaces from multiple hosts, each with
+    its own credentials. For example:
 
         [
-            {"conn_id": "confluence_a", "space_key": "a"},
-            {"conn_id": "confluence_a", "space_key": "b"},
-            {"conn_id": "confluence_b", "space_key": "c"}
+            {"conn_id": "confluence_host_1", "space_key": "a"},
+            {"conn_id": "confluence_host_2", "space_key": "b"},
+            {"conn_id": "confluence_host_3", "space_key": "c"}
         ]
 
     All the pages of all targets/spaces are fetched and saved to the database as
@@ -207,9 +207,9 @@ def ingest_confluence_spaces():
 
     db_setup >> targets  # type: ignore
 
-    docs_by_space = save_documents.expand(target=targets)
+    docs_by_space = save_documents.expand(target=targets)  # type: ignore
     docs = flatten_documents(docs_by_space)  # type: ignore
-    process_document.expand(doc=docs)
+    process_document.expand(doc=docs)  # type: ignore
 
 
 dag = ingest_confluence_spaces()

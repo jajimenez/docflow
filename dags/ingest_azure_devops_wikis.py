@@ -13,7 +13,7 @@ RETRIES = 3
 RETRY_DELAY = timedelta(minutes=5)
 
 # Name of the Airflow variable holding the list of Azure DevOps targets (JSON)
-AZURE_DEVOPS_TARGETS_VAR = "docflow_azure_devops_targets"
+AZURE_DEVOPS_TARGETS_VAR = "azure_devops_targets"
 
 
 def _get_azure_devops_options(conn_id: str) -> dict:
@@ -64,16 +64,16 @@ def _get_azure_devops_options(conn_id: str) -> dict:
 def ingest_azure_devops_wikis():
     """DAG to ingest the pages of one or more Azure DevOps wikis.
 
-    This DAG ingests every Azure DevOps target configured in the
-    "docflow_azure_devops_targets" Airflow variable, which is a JSON list of objects,
-    each with a "conn_id" (the Airflow connection for an Azure DevOps organization and
-    its PAT), a "project" and a "wiki". This allows ingesting multiple wikis from
-    multiple organizations. For example:
+    This DAG ingests every Azure DevOps target configured in the "azure_devops_targets"
+    Airflow variable, which is a JSON list of objects, each with a "conn_id" (the
+    Airflow connection for an Azure DevOps organization and its PAT), a "project" and a
+    "wiki". This allows ingesting multiple wikis from multiple organizations. For
+    example:
 
         [
-            {"conn_id": "azure_devops_myorg", "project": "a", "wiki": "a.wiki"},
-            {"conn_id": "azure_devops_myorg", "project": "b", "wiki": "b.wiki"},
-            {"conn_id": "azure_devops_other", "project": "c", "wiki": "c.wiki"}
+            {"conn_id": "azure_devops_org_1", "project": "a", "wiki": "a.wiki"},
+            {"conn_id": "azure_devops_org_2", "project": "b", "wiki": "b.wiki"},
+            {"conn_id": "azure_devops_org_3", "project": "c", "wiki": "c.wiki"}
         ]
 
     All the pages of all targets/wikis are fetched and saved to the database as
@@ -195,9 +195,9 @@ def ingest_azure_devops_wikis():
 
     db_setup >> targets  # type: ignore
 
-    docs_by_wiki = save_documents.expand(target=targets)
+    docs_by_wiki = save_documents.expand(target=targets)  # type: ignore
     docs = flatten_documents(docs_by_wiki)  # type: ignore
-    process_document.expand(doc=docs)
+    process_document.expand(doc=docs)  # type: ignore
 
 
 dag = ingest_azure_devops_wikis()
